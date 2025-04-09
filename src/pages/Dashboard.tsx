@@ -3,8 +3,8 @@ import React from 'react';
 import { useData } from '@/contexts/DataContext';
 import StatCard from '@/components/common/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, PieChart, Gem, Users, Coins, Briefcase, Wallet } from 'lucide-react';
-import { CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+import { BarChart as BarChartIcon, PieChart as PieChartIcon, Gem, Users, Coins, Briefcase, Wallet } from 'lucide-react';
+import { CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, ResponsiveContainer, BarChart, PieChart, Pie, Cell } from 'recharts';
 
 const Dashboard = () => {
   const { diamonds, clients, marketRates } = useData();
@@ -127,7 +127,7 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <BarChart className="mr-2 h-5 w-5" />
+              <BarChartIcon className="mr-2 h-5 w-5" />
               Inventory Trend (Last 5 Days)
             </CardTitle>
           </CardHeader>
@@ -153,14 +153,14 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <PieChart className="mr-2 h-5 w-5" />
+              <PieChartIcon className="mr-2 h-5 w-5" />
               Client Distribution
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
+                <PieChart>
                   <Pie
                     data={clientDistributionData}
                     cx="50%"
@@ -176,7 +176,7 @@ const Dashboard = () => {
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, 'Value']} />
-                </RechartsPieChart>
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
