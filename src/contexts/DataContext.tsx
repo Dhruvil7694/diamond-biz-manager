@@ -130,9 +130,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (marketRatesError) throw marketRatesError;
       
       // Map data to application types
-      setClients(clientsData.map(mapSupabaseClientToClient));
-      setDiamonds(diamondsData.map(mapSupabaseDiamondToDiamond));
-      setMarketRates(marketRatesData.map(mapSupabaseMarketRateToMarketRate));
+      setClients(clientsData ? clientsData.map(mapSupabaseClientToClient) : []);
+      setDiamonds(diamondsData ? diamondsData.map(mapSupabaseDiamondToDiamond) : []);
+      setMarketRates(marketRatesData ? marketRatesData.map(mapSupabaseMarketRateToMarketRate) : []);
       
     } catch (error: any) {
       toast.error(`Error loading data: ${error.message}`);
@@ -165,7 +165,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           four_p_minus_rate: clientData.rates.fourPMinus,
           payment_terms: clientData.paymentTerms,
           notes: clientData.notes,
-        })
+        } as Database['public']['Tables']['clients']['Insert'])
         .select();
       
       if (error) throw error;
@@ -228,7 +228,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           category,
           raw_damage_weight: diamondData.rawDamageWeight || null,
           total_value: totalValue,
-        })
+        } as Database['public']['Tables']['diamonds']['Insert'])
         .select();
       
       if (error) throw error;
@@ -250,7 +250,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           date: rate.date,
           four_p_plus_rate: rate.fourPPlusRate,
           four_p_minus_rate: rate.fourPMinusRate,
-        })
+        } as Database['public']['Tables']['market_rates']['Insert'])
         .select();
       
       if (error) throw error;

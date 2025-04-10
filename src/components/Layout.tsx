@@ -68,12 +68,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return <>{children}</>;
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase();
+  // Since Supabase User type doesn't have a name property,
+  // we'll use email or a default value
+  const getUserDisplayName = () => {
+    return user.email?.split('@')[0] || 'User';
+  };
+
+  // Use first letter of email as avatar fallback
+  const getInitials = () => {
+    if (user.email) {
+      return user.email.charAt(0).toUpperCase();
+    }
+    return 'U';
   };
 
   return (
@@ -113,12 +119,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-diamond-100 text-diamond-800">
-                  {getInitials(user.name)}
+                  {getInitials()}
                 </AvatarFallback>
               </Avatar>
               <div className="ml-2">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user.role.replace('-', ' ')}</p>
+                <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={handleLogout} title="Log out">
