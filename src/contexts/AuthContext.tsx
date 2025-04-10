@@ -41,6 +41,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           refresh_token: 'mock-refresh',
           expires_in: 3600,
           expires_at: new Date().getTime() + 3600000,
+          token_type: 'bearer', // Add the missing token_type property
           user: parsedUser,
         } as Session);
       } catch (error) {
@@ -81,6 +82,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           refresh_token: 'mock-refresh',
           expires_in: 3600,
           expires_at: new Date().getTime() + 3600000,
+          token_type: 'bearer', // Add the missing token_type property
           user: customUser,
         } as Session;
         
