@@ -12,11 +12,15 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
-// Define a custom user object for our fixed user
-interface CustomUser {
-  email: string;
+// Define a custom user object that extends the required User properties
+interface CustomUser extends User {
   name: string;
+  email: string;
   id: string;
+  app_metadata: Record<string, any>;
+  user_metadata: Record<string, any>;
+  aud: string;
+  created_at: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -33,7 +37,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const savedUser = localStorage.getItem('dbms_user');
     if (savedUser) {
       try {
-        const parsedUser = JSON.parse(savedUser);
+        const parsedUser = JSON.parse(savedUser) as CustomUser;
         setUser(parsedUser as User);
         // Create a mock session
         setSession({
@@ -41,9 +45,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           refresh_token: 'mock-refresh',
           expires_in: 3600,
           expires_at: new Date().getTime() + 3600000,
-          token_type: 'bearer', // Add the missing token_type property
-          user: parsedUser,
-        } as Session);
+          token_type: 'bearer',
+          user: parsedUser as User,
+        });
       } catch (error) {
         console.error("Failed to parse saved user:", error);
         localStorage.removeItem('dbms_user');
@@ -63,28 +67,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
          email.toLowerCase() === 'hiren patel') && 
         password === 'Hp#9879225849'
       ) {
-        // Create a custom user object
+        // Create a custom user object with all required User properties
         const customUser: CustomUser = {
           email: 'hiren.patel@example.com',
           name: 'Hiren Patel',
           id: '1234567890',
+          app_metadata: {},
+          user_metadata: { name: 'Hiren Patel' },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
         };
         
         // Save to localStorage for persistence
         localStorage.setItem('dbms_user', JSON.stringify(customUser));
         
         // Update state
-        setUser(customUser as unknown as User);
+        setUser(customUser as User);
         
         // Create a mock session
-        const mockSession = {
+        const mockSession: Session = {
           access_token: 'mock-token',
           refresh_token: 'mock-refresh',
           expires_in: 3600,
           expires_at: new Date().getTime() + 3600000,
-          token_type: 'bearer', // Add the missing token_type property
-          user: customUser,
-        } as Session;
+          token_type: 'bearer',
+          user: customUser as User,
+        };
         
         setSession(mockSession);
         
