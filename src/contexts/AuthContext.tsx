@@ -1,92 +1,96 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'manager' | 'data-entry';
-}
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Mock users for demonstration
-const mockUsers = [
-  {
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@example.com',
-    password: 'admin123',
-    role: 'admin' as const,
-  },
-  {
-    id: '2',
-    name: 'Manager User',
-    email: 'manager@example.com',
-    password: 'manager123',
-    role: 'manager' as const,
-  },
-  {
-    id: '3',
-    name: 'Data Entry User',
-    email: 'data@example.com',
-    password: 'data123',
-    role: 'data-entry' as const,
-  },
-];
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Check for stored user session on initial load
-  React.useEffect(() => {
-    const storedUser = localStorage.getItem('dbms_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+  // Set up auth state listener and check for existing session
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsInitializing(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // Simulating API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = mockUsers.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    
-    setIsLoading(false);
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('dbms_user', JSON.stringify(userWithoutPassword));
-      toast.success('Login successful');
-      return true;
-    } else {
-      toast.error('Invalid email or password');
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+      
+      if (data.user) {
+        toast.success('Login successful');
+        return true;
+      }
+      
       return false;
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred during login');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('dbms_user');
-    toast.info('You have been logged out');
+  const logout = async () => {
+    setIsLoading(true);
+    
+    try {
+      await supabase.auth.signOut();
+      toast.info('You have been logged out');
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred during logout');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  if (isInitializing) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-diamond-600"></div>
+    </div>;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, session, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

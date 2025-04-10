@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Gem, Loader2 } from 'lucide-react';
@@ -7,19 +7,42 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { login, isLoading, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login(email, password);
-    if (success) {
-      navigate('/dashboard');
+    
+    // Validate inputs
+    if (!email || !password) {
+      toast.error('Please fill in all fields');
+      return;
     }
+    
+    // Handle login
+    if (!isSignUp) {
+      const success = await login(email, password);
+      if (success) {
+        navigate('/dashboard');
+      }
+      return;
+    }
+    
+    // For now, only login is implemented - sign-up would be similar
+    toast.info('Sign up not implemented in this demo. Please use the demo accounts.');
   };
 
   return (
@@ -35,9 +58,12 @@ const Login = () => {
         
         <Card className="shadow-lg border-diamond-100">
           <CardHeader>
-            <CardTitle className="text-xl">Sign In</CardTitle>
+            <CardTitle className="text-xl">{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
             <CardDescription>
-              Enter your credentials to access your account
+              {isSignUp 
+                ? 'Create a new account to get started' 
+                : 'Enter your credentials to access your account'
+              }
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
@@ -57,9 +83,11 @@ const Login = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Button variant="link" size="sm" className="text-xs text-diamond-600 h-auto p-0">
-                    Forgot password?
-                  </Button>
+                  {!isSignUp && (
+                    <Button variant="link" size="sm" className="text-xs text-diamond-600 h-auto p-0">
+                      Forgot password?
+                    </Button>
+                  )}
                 </div>
                 <Input
                   id="password"
@@ -72,7 +100,7 @@ const Login = () => {
                 />
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex flex-col space-y-3">
               <Button 
                 type="submit" 
                 className="w-full bg-diamond-600 hover:bg-diamond-700"
@@ -81,7 +109,19 @@ const Login = () => {
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Sign In
+                {isSignUp ? 'Create Account' : 'Sign In'}
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="text-sm text-diamond-600"
+                onClick={() => setIsSignUp(!isSignUp)}
+              >
+                {isSignUp 
+                  ? 'Already have an account? Sign in' 
+                  : 'Don\'t have an account? Sign up'
+                }
               </Button>
             </CardFooter>
           </form>

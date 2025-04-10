@@ -9,13 +9,243 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      clients: {
+        Row: {
+          company: string
+          contact_person: string
+          created_at: string
+          email: string | null
+          four_p_minus_rate: number
+          four_p_plus_rate: number
+          id: string
+          name: string
+          notes: string | null
+          payment_terms: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          company: string
+          contact_person: string
+          created_at?: string
+          email?: string | null
+          four_p_minus_rate: number
+          four_p_plus_rate: number
+          id?: string
+          name: string
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company?: string
+          contact_person?: string
+          created_at?: string
+          email?: string | null
+          four_p_minus_rate?: number
+          four_p_plus_rate?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      diamonds: {
+        Row: {
+          category: string
+          client_id: string
+          created_at: string
+          entry_date: string
+          id: string
+          kapan_id: string
+          market_rate: number
+          number_of_diamonds: number
+          raw_damage_weight: number | null
+          total_value: number
+          updated_at: string
+          weight_in_karats: number
+        }
+        Insert: {
+          category: string
+          client_id: string
+          created_at?: string
+          entry_date?: string
+          id?: string
+          kapan_id: string
+          market_rate: number
+          number_of_diamonds: number
+          raw_damage_weight?: number | null
+          total_value: number
+          updated_at?: string
+          weight_in_karats: number
+        }
+        Update: {
+          category?: string
+          client_id?: string
+          created_at?: string
+          entry_date?: string
+          id?: string
+          kapan_id?: string
+          market_rate?: number
+          number_of_diamonds?: number
+          raw_damage_weight?: number | null
+          total_value?: number
+          updated_at?: string
+          weight_in_karats?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diamonds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          diamond_id: string
+          id: string
+          invoice_id: string
+          price: number
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          diamond_id: string
+          id?: string
+          invoice_id: string
+          price: number
+          quantity: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          diamond_id?: string
+          id?: string
+          invoice_id?: string
+          price?: number
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_diamond_id_fkey"
+            columns: ["diamond_id"]
+            isOneToOne: false
+            referencedRelation: "diamonds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          client_id: string
+          created_at: string
+          due_date: string
+          id: string
+          invoice_number: string
+          issue_date: string
+          notes: string | null
+          payment_date: string | null
+          status: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          notes?: string | null
+          payment_date?: string | null
+          status: string
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          notes?: string | null
+          payment_date?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_rates: {
+        Row: {
+          created_at: string
+          date: string
+          four_p_minus_rate: number
+          four_p_plus_rate: number
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          four_p_minus_rate: number
+          four_p_plus_rate: number
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          four_p_minus_rate?: number
+          four_p_plus_rate?: number
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_diamond_value: {
+        Args: {
+          category: string
+          weight_in_karats: number
+          number_of_diamonds: number
+          four_p_plus_rate: number
+          four_p_minus_rate: number
+          raw_damage_weight?: number
+        }
+        Returns: number
+      }
+      determine_diamond_category: {
+        Args: { weight_in_karats: number; number_of_diamonds: number }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

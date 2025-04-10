@@ -1,5 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
+import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
 
 // Define types for the data
 export interface Diamond {
@@ -36,134 +40,143 @@ export interface MarketRate {
   fourPMinusRate: number;
 }
 
+// Map types from Supabase to our application types
+type SupabaseDiamond = Database['public']['Tables']['diamonds']['Row'];
+type SupabaseClient = Database['public']['Tables']['clients']['Row'];
+type SupabaseMarketRate = Database['public']['Tables']['market_rates']['Row'];
+
 interface DataContextType {
   diamonds: Diamond[];
   clients: Client[];
   marketRates: MarketRate[];
-  addClient: (client: Omit<Client, 'id'>) => void;
-  addDiamond: (diamond: Omit<Diamond, 'id' | 'category' | 'totalValue'>) => void;
-  updateMarketRate: (rate: MarketRate) => void;
+  addClient: (client: Omit<Client, 'id'>) => Promise<void>;
+  addDiamond: (diamond: Omit<Diamond, 'id' | 'category' | 'totalValue'>) => Promise<void>;
+  updateMarketRate: (rate: MarketRate) => Promise<void>;
   getClientById: (id: string) => Client | undefined;
+  isLoading: boolean;
+  refetchData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
 
-// Mock initial data
-const mockClients: Client[] = [
-  {
-    id: '1',
-    name: 'Diamond Traders Inc',
-    contactPerson: 'John Smith',
-    phone: '123-456-7890',
-    email: 'john@diamondtraders.com',
-    company: 'Diamond Traders Inc',
-    rates: {
-      fourPPlus: 5000, // $5000 per karat
-      fourPMinus: 300,  // $300 per piece
-    },
-    paymentTerms: 'Net 30',
-    notes: 'Preferred client, provide priority service',
-  },
-  {
-    id: '2',
-    name: 'Gem Solutions LLC',
-    contactPerson: 'Sarah Johnson',
-    phone: '987-654-3210',
-    email: 'sarah@gemsolutions.com',
-    company: 'Gem Solutions LLC',
-    rates: {
-      fourPPlus: 5200, // $5200 per karat
-      fourPMinus: 310,  // $310 per piece
-    },
-    paymentTerms: 'Net 15',
-    notes: 'New client, verify all orders',
-  },
-];
+// Map Supabase data to application data
+const mapSupabaseDiamondToDiamond = (diamond: SupabaseDiamond): Diamond => ({
+  id: diamond.id,
+  entryDate: diamond.entry_date,
+  clientId: diamond.client_id,
+  kapanId: diamond.kapan_id,
+  numberOfDiamonds: diamond.number_of_diamonds,
+  weightInKarats: diamond.weight_in_karats,
+  marketRate: diamond.market_rate,
+  category: diamond.category as '4P Plus' | '4P Minus',
+  rawDamageWeight: diamond.raw_damage_weight || undefined,
+  totalValue: diamond.total_value,
+});
 
-const mockMarketRates: MarketRate[] = [
-  {
-    date: new Date().toISOString(),
-    fourPPlusRate: 5100, // $5100 per karat
-    fourPMinusRate: 305,  // $305 per piece
+const mapSupabaseClientToClient = (client: SupabaseClient): Client => ({
+  id: client.id,
+  name: client.name,
+  contactPerson: client.contact_person,
+  phone: client.phone || '',
+  email: client.email || '',
+  company: client.company,
+  rates: {
+    fourPPlus: client.four_p_plus_rate,
+    fourPMinus: client.four_p_minus_rate,
   },
-];
+  paymentTerms: client.payment_terms || '',
+  notes: client.notes || '',
+});
 
-// Generate mock diamond data
-const generateMockDiamonds = (): Diamond[] => {
-  const diamonds: Diamond[] = [];
-  const today = new Date();
-  
-  // Add some 4P Plus diamonds
-  diamonds.push({
-    id: '1',
-    entryDate: new Date(today.setDate(today.getDate() - 5)).toISOString(),
-    clientId: '1',
-    kapanId: '203A',
-    numberOfDiamonds: 20,
-    weightInKarats: 10.5,
-    marketRate: 5100,
-    category: '4P Plus',
-    totalValue: 10.5 * 5000, // Weight * client rate
-  });
-  
-  // Add some 4P Minus diamonds
-  diamonds.push({
-    id: '2',
-    entryDate: new Date(today.setDate(today.getDate() - 3)).toISOString(),
-    clientId: '1',
-    kapanId: '203A',
-    numberOfDiamonds: 136,
-    weightInKarats: 18.2,
-    marketRate: 305,
-    category: '4P Minus',
-    totalValue: 136 * 300, // Number * client rate
-  });
-  
-  // Add one more entry for a different client
-  diamonds.push({
-    id: '3',
-    entryDate: new Date().toISOString(),
-    clientId: '2',
-    kapanId: '415B',
-    numberOfDiamonds: 45,
-    weightInKarats: 25.8,
-    marketRate: 5100,
-    category: '4P Plus',
-    totalValue: 25.8 * 5200, // Weight * client rate
-  });
-  
-  return diamonds;
-};
+const mapSupabaseMarketRateToMarketRate = (marketRate: SupabaseMarketRate): MarketRate => ({
+  date: marketRate.date,
+  fourPPlusRate: marketRate.four_p_plus_rate,
+  fourPMinusRate: marketRate.four_p_minus_rate,
+});
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [diamonds, setDiamonds] = useState<Diamond[]>(generateMockDiamonds());
-  const [clients, setClients] = useState<Client[]>(mockClients);
-  const [marketRates, setMarketRates] = useState<MarketRate[]>(mockMarketRates);
+  const [diamonds, setDiamonds] = useState<Diamond[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [marketRates, setMarketRates] = useState<MarketRate[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { session } = useAuth();
 
-  // In a real application, we would load this data from API/database
-  useEffect(() => {
-    // Load data from localStorage if it exists
-    const storedDiamonds = localStorage.getItem('dbms_diamonds');
-    const storedClients = localStorage.getItem('dbms_clients');
-    const storedMarketRates = localStorage.getItem('dbms_marketRates');
-    
-    if (storedDiamonds) setDiamonds(JSON.parse(storedDiamonds));
-    if (storedClients) setClients(JSON.parse(storedClients));
-    if (storedMarketRates) setMarketRates(JSON.parse(storedMarketRates));
-  }, []);
+  // Function to fetch data
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch clients
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (clientsError) throw clientsError;
+      
+      // Fetch diamonds
+      const { data: diamondsData, error: diamondsError } = await supabase
+        .from('diamonds')
+        .select('*')
+        .order('entry_date', { ascending: false });
+      
+      if (diamondsError) throw diamondsError;
+      
+      // Fetch market rates
+      const { data: marketRatesData, error: marketRatesError } = await supabase
+        .from('market_rates')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (marketRatesError) throw marketRatesError;
+      
+      // Map data to application types
+      setClients(clientsData.map(mapSupabaseClientToClient));
+      setDiamonds(diamondsData.map(mapSupabaseDiamondToDiamond));
+      setMarketRates(marketRatesData.map(mapSupabaseMarketRateToMarketRate));
+      
+    } catch (error: any) {
+      toast.error(`Error loading data: ${error.message}`);
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  // Save to localStorage whenever data changes
+  // Refetch data function exposed in the context
+  const refetchData = fetchData;
+
+  // Initial data loading
   useEffect(() => {
-    localStorage.setItem('dbms_diamonds', JSON.stringify(diamonds));
-  }, [diamonds]);
-  
-  useEffect(() => {
-    localStorage.setItem('dbms_clients', JSON.stringify(clients));
-  }, [clients]);
-  
-  useEffect(() => {
-    localStorage.setItem('dbms_marketRates', JSON.stringify(marketRates));
-  }, [marketRates]);
+    fetchData();
+  }, [session]);
+
+  // Function to add a client
+  const addClient = async (clientData: Omit<Client, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .insert({
+          name: clientData.name,
+          contact_person: clientData.contactPerson,
+          phone: clientData.phone,
+          email: clientData.email,
+          company: clientData.company,
+          four_p_plus_rate: clientData.rates.fourPPlus,
+          four_p_minus_rate: clientData.rates.fourPMinus,
+          payment_terms: clientData.paymentTerms,
+          notes: clientData.notes,
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      await fetchData(); // Refetch all data
+      toast.success('Client added successfully');
+    } catch (error: any) {
+      toast.error(`Error adding client: ${error.message}`);
+      console.error('Error adding client:', error);
+    }
+  };
 
   // Function to determine diamond category based on weight per piece
   const determineDiamondCategory = (weightInKarats: number, numberOfDiamonds: number): '4P Plus' | '4P Minus' => {
@@ -171,7 +184,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return weightPerDiamond > 0.15 ? '4P Plus' : '4P Minus';
   };
 
-  // Function to calculate diamond value based on category and client rates
+  // Function to calculate diamond value
   const calculateDiamondValue = (
     category: '4P Plus' | '4P Minus',
     clientId: string,
@@ -191,38 +204,66 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const addClient = (clientData: Omit<Client, 'id'>) => {
-    const newClient: Client = {
-      ...clientData,
-      id: `${clients.length + 1}`,
-    };
-    setClients([...clients, newClient]);
+  // Function to add a diamond
+  const addDiamond = async (diamondData: Omit<Diamond, 'id' | 'category' | 'totalValue'>) => {
+    try {
+      const category = determineDiamondCategory(diamondData.weightInKarats, diamondData.numberOfDiamonds);
+      const totalValue = calculateDiamondValue(
+        category,
+        diamondData.clientId,
+        diamondData.weightInKarats,
+        diamondData.numberOfDiamonds,
+        diamondData.rawDamageWeight
+      );
+
+      const { data, error } = await supabase
+        .from('diamonds')
+        .insert({
+          entry_date: diamondData.entryDate,
+          client_id: diamondData.clientId,
+          kapan_id: diamondData.kapanId,
+          number_of_diamonds: diamondData.numberOfDiamonds,
+          weight_in_karats: diamondData.weightInKarats,
+          market_rate: diamondData.marketRate,
+          category,
+          raw_damage_weight: diamondData.rawDamageWeight || null,
+          total_value: totalValue,
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      await fetchData(); // Refetch all data
+      toast.success('Diamond entry added successfully');
+    } catch (error: any) {
+      toast.error(`Error adding diamond: ${error.message}`);
+      console.error('Error adding diamond:', error);
+    }
   };
 
-  const addDiamond = (diamondData: Omit<Diamond, 'id' | 'category' | 'totalValue'>) => {
-    const category = determineDiamondCategory(diamondData.weightInKarats, diamondData.numberOfDiamonds);
-    const totalValue = calculateDiamondValue(
-      category,
-      diamondData.clientId,
-      diamondData.weightInKarats,
-      diamondData.numberOfDiamonds,
-      diamondData.rawDamageWeight
-    );
-    
-    const newDiamond: Diamond = {
-      ...diamondData,
-      id: `${diamonds.length + 1}`,
-      category,
-      totalValue,
-    };
-    
-    setDiamonds([...diamonds, newDiamond]);
+  // Function to update market rate
+  const updateMarketRate = async (rate: MarketRate) => {
+    try {
+      const { data, error } = await supabase
+        .from('market_rates')
+        .insert({
+          date: rate.date,
+          four_p_plus_rate: rate.fourPPlusRate,
+          four_p_minus_rate: rate.fourPMinusRate,
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      await fetchData(); // Refetch all data
+      toast.success('Market rate updated successfully');
+    } catch (error: any) {
+      toast.error(`Error updating market rate: ${error.message}`);
+      console.error('Error updating market rate:', error);
+    }
   };
 
-  const updateMarketRate = (rate: MarketRate) => {
-    setMarketRates([rate, ...marketRates]);
-  };
-
+  // Function to get client by ID
   const getClientById = (id: string) => {
     return clients.find(client => client.id === id);
   };
@@ -236,6 +277,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addDiamond,
       updateMarketRate,
       getClientById,
+      isLoading,
+      refetchData,
     }}>
       {children}
     </DataContext.Provider>
