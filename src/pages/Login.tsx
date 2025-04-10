@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const { login, isLoading, user } = useAuth();
   const navigate = useNavigate();
 
@@ -33,16 +32,10 @@ const Login = () => {
     }
     
     // Handle login
-    if (!isSignUp) {
-      const success = await login(email, password);
-      if (success) {
-        navigate('/dashboard');
-      }
-      return;
+    const success = await login(email, password);
+    if (success) {
+      navigate('/dashboard');
     }
-    
-    // For now, only login is implemented - sign-up would be similar
-    toast.info('Sign up not implemented in this demo. Please use the demo accounts.');
   };
 
   return (
@@ -58,22 +51,19 @@ const Login = () => {
         
         <Card className="shadow-lg border-diamond-100">
           <CardHeader>
-            <CardTitle className="text-xl">{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
+            <CardTitle className="text-xl">Sign In</CardTitle>
             <CardDescription>
-              {isSignUp 
-                ? 'Create a new account to get started' 
-                : 'Enter your credentials to access your account'
-              }
+              Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address or Username</Label>
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="email@example.com"
+                  type="text"
+                  placeholder="hiren.patel@example.com or Hiren Patel"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -81,14 +71,7 @@ const Login = () => {
                 />
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  {!isSignUp && (
-                    <Button variant="link" size="sm" className="text-xs text-diamond-600 h-auto p-0">
-                      Forgot password?
-                    </Button>
-                  )}
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -109,29 +92,16 @@ const Login = () => {
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                {isSignUp ? 'Create Account' : 'Sign In'}
-              </Button>
-              
-              <Button 
-                type="button" 
-                variant="ghost" 
-                className="text-sm text-diamond-600"
-                onClick={() => setIsSignUp(!isSignUp)}
-              >
-                {isSignUp 
-                  ? 'Already have an account? Sign in' 
-                  : 'Don\'t have an account? Sign up'
-                }
+                Sign In
               </Button>
             </CardFooter>
           </form>
         </Card>
         
         <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>Demo Accounts:</p>
-          <p>admin@example.com / admin123</p>
-          <p>manager@example.com / manager123</p>
-          <p>data@example.com / data123</p>
+          <p>Demo Account:</p>
+          <p>Username: Hiren Patel</p>
+          <p>Password: Hp#9879225849</p>
         </div>
       </div>
     </div>

@@ -12,6 +12,13 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
+// Define a custom user object for our fixed user
+interface CustomUser {
+  email: string;
+  name: string;
+  id: string;
+}
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -22,45 +29,68 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Set up auth state listener and check for existing session
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Check if we have a user in localStorage
+    const savedUser = localStorage.getItem('dbms_user');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser as User);
+        // Create a mock session
+        setSession({
+          access_token: 'mock-token',
+          refresh_token: 'mock-refresh',
+          expires_in: 3600,
+          expires_at: new Date().getTime() + 3600000,
+          user: parsedUser,
+        } as Session);
+      } catch (error) {
+        console.error("Failed to parse saved user:", error);
+        localStorage.removeItem('dbms_user');
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsInitializing(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    }
+    
+    setIsInitializing(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) {
-        toast.error(error.message);
-        return false;
-      }
-      
-      if (data.user) {
+      // Fixed credentials check
+      if (
+        (email.toLowerCase() === 'hiren.patel@example.com' || 
+         email.toLowerCase() === 'hiren patel') && 
+        password === 'Hp#9879225849'
+      ) {
+        // Create a custom user object
+        const customUser: CustomUser = {
+          email: 'hiren.patel@example.com',
+          name: 'Hiren Patel',
+          id: '1234567890',
+        };
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('dbms_user', JSON.stringify(customUser));
+        
+        // Update state
+        setUser(customUser as unknown as User);
+        
+        // Create a mock session
+        const mockSession = {
+          access_token: 'mock-token',
+          refresh_token: 'mock-refresh',
+          expires_in: 3600,
+          expires_at: new Date().getTime() + 3600000,
+          user: customUser,
+        } as Session;
+        
+        setSession(mockSession);
+        
         toast.success('Login successful');
         return true;
       }
       
+      toast.error('Invalid credentials');
       return false;
     } catch (error: any) {
       toast.error(error.message || 'An error occurred during login');
@@ -74,7 +104,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     
     try {
-      await supabase.auth.signOut();
+      // Clear stored user
+      localStorage.removeItem('dbms_user');
+      
+      // Clear state
+      setUser(null);
+      setSession(null);
+      
       toast.info('You have been logged out');
     } catch (error: any) {
       toast.error(error.message || 'An error occurred during logout');
