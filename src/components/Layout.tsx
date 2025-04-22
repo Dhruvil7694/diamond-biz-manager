@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';
+import { jsxDEV as _jsxDEV } from 'react/jsx-dev-runtime';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
