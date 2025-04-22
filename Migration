@@ -1,0 +1,127 @@
+
+-- Create market_rates table to track pricing history
+CREATE TABLE public.market_rates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  four_p_plus_rate NUMERIC(10, 2) NOT NULL,
+  four_p_minus_rate NUMERIC(10, 2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create clients table for client management
+CREATE TABLE public.clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  contact_person TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  company TEXT NOT NULL,
+  four_p_plus_rate NUMERIC(10, 2) NOT NULL,
+  four_p_minus_rate NUMERIC(10, 2) NOT NULL,
+  payment_terms TEXT,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create diamond_entries table for inventory management
+CREATE TABLE public.diamonds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  client_id UUID NOT NULL REFERENCES public.clients(id),
+  kapan_id TEXT NOT NULL,
+  number_of_diamonds INTEGER NOT NULL,
+  weight_in_karats NUMERIC(10, 2) NOT NULL,
+  market_rate NUMERIC(10, 2) NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('4P Plus', '4P Minus')),
+  raw_damage_weight NUMERIC(10, 2),
+  total_value NUMERIC(12, 2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create invoices table
+CREATE TABLE public.invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_number TEXT NOT NULL UNIQUE,
+  client_id UUID NOT NULL REFERENCES public.clients(id),
+  issue_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  due_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  total_amount NUMERIC(12, 2) NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('draft', 'pending', 'paid', 'cancelled')),
+  payment_date TIMESTAMP WITH TIME ZONE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create invoice_items to link invoices with diamond entries
+CREATE TABLE public.invoice_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID NOT NULL REFERENCES public.invoices(id) ON DELETE CASCADE,
+  diamond_id UUID NOT NULL REFERENCES public.diamonds(id),
+  quantity INTEGER NOT NULL,
+  price NUMERIC(12, 2) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Enable Row Level Security
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.diamonds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.market_rates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
+
+-- Create basic policies (these can be refined later when we implement authentication)
+-- For now, allow all access for development
+CREATE POLICY "Allow all access to clients" ON public.clients FOR ALL USING (true);
+CREATE POLICY "Allow all access to diamonds" ON public.diamonds FOR ALL USING (true);
+CREATE POLICY "Allow all access to market_rates" ON public.market_rates FOR ALL USING (true);
+CREATE POLICY "Allow all access to invoices" ON public.invoices FOR ALL USING (true);
+CREATE POLICY "Allow all access to invoice_items" ON public.invoice_items FOR ALL USING (true);
+
+-- Create function to determine diamond category based on weight per piece
+CREATE OR REPLACE FUNCTION public.determine_diamond_category(
+  weight_in_karats NUMERIC,
+  number_of_diamonds INTEGER
+) RETURNS TEXT LANGUAGE plpgsql AS $$
+BEGIN
+  IF (weight_in_karats / number_of_diamonds) > 0.15 THEN
+    RETURN '4P Plus';
+  ELSE
+    RETURN '4P Minus';
+  END IF;
+END;
+$$;
+
+-- Create function to calculate diamond value based on category and client rates
+CREATE OR REPLACE FUNCTION public.calculate_diamond_value(
+  category TEXT,
+  weight_in_karats NUMERIC,
+  number_of_diamonds INTEGER,
+  four_p_plus_rate NUMERIC,
+  four_p_minus_rate NUMERIC,
+  raw_damage_weight NUMERIC DEFAULT 0
+) RETURNS NUMERIC LANGUAGE plpgsql AS $$
+DECLARE
+  adjusted_weight NUMERIC;
+  value NUMERIC;
+BEGIN
+  adjusted_weight := weight_in_karats - COALESCE(raw_damage_weight, 0);
+  
+  IF category = '4P Plus' THEN
+    value := adjusted_weight * four_p_plus_rate;
+  ELSE
+    value := number_of_diamonds * four_p_minus_rate;
+  END IF;
+  
+  RETURN value;
+END;
+$$;
+
+-- Insert initial market rates
+INSERT INTO public.market_rates (four_p_plus_rate, four_p_minus_rate)
+VALUES (5100, 305);
+
+

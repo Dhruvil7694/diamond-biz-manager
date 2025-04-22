@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useData, Client } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
@@ -238,20 +237,20 @@ const DiamondEntryForm = () => {
                   <>
                     <div>Rate (per karat):</div>
                     <div className="font-medium">
-                      ${selectedClient?.rates.fourPPlus.toLocaleString()}
+                      ₹{selectedClient?.rates.fourPPlus.toLocaleString('en-IN')}
                     </div>
                   </>
                 ) : (
                   <>
                     <div>Rate (per piece):</div>
                     <div className="font-medium">
-                      ${selectedClient?.rates.fourPMinus.toLocaleString()}
+                      ₹{selectedClient?.rates.fourPMinus.toLocaleString('en-IN')}
                     </div>
                   </>
                 )}
                 
                 <div>Estimated Value:</div>
-                <div className="font-medium">${estimatedValue.toLocaleString()}</div>
+                <div className="font-medium">₹{estimatedValue.toLocaleString('en-IN')}</div>
               </div>
             </div>
           )}

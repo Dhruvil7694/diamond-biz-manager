@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { useData, Diamond, Client } from '@/contexts/DataContext';
+import { useData } from '@/contexts/DataContext';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -18,158 +18,134 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { Filter, MoreHorizontal, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { MoreVertical, Search, Edit, Eye, Plus } from 'lucide-react';
+import EditDiamondDialog from './EditDiamondDialog';
 
-const DiamondTable = () => {
+interface DiamondTableProps {
+  filterClientId?: string;
+  hideClientColumn?: boolean;
+}
+
+const DiamondTable = ({ filterClientId, hideClientColumn = false }: DiamondTableProps) => {
   const { diamonds, clients } = useData();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof Diamond | null;
-    direction: 'asc' | 'desc';
-  }>({
-    key: 'entryDate',
-    direction: 'desc',
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDiamond, setSelectedDiamond] = useState<string | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const navigate = useNavigate();
+
+  // Filter diamonds based on search term and clientId
+  const filteredDiamonds = diamonds.filter(diamond => {
+    const client = clients.find(c => c.id === diamond.clientId);
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      client?.name.toLowerCase().includes(searchLower) ||
+      diamond.category.toLowerCase().includes(searchLower);
+    
+    if (filterClientId) {
+      return diamond.clientId === filterClientId && matchesSearch;
+    }
+    return matchesSearch;
   });
 
-  // Client lookup function
-  const getClientName = (clientId: string): string => {
-    const client = clients.find(c => c.id === clientId);
-    return client ? client.name : 'Unknown Client';
+  const handleEdit = (diamondId: string) => {
+    setSelectedDiamond(diamondId);
+    setShowEditDialog(true);
   };
-  
-  // Filter and sort diamonds
-  const filteredDiamonds = diamonds.filter(diamond => {
-    const searchLower = searchQuery.toLowerCase();
-    const clientName = getClientName(diamond.clientId).toLowerCase();
-    
-    return (
-      diamond.kapanId.toLowerCase().includes(searchLower) ||
-      clientName.includes(searchLower) ||
-      diamond.category.toLowerCase().includes(searchLower)
-    );
-  });
-  
-  // Apply sorting
-  const sortedDiamonds = [...filteredDiamonds].sort((a, b) => {
-    if (sortConfig.key === null) return 0;
-    
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
-    
-    if (aValue < bValue) {
-      return sortConfig.direction === 'asc' ? -1 : 1;
-    }
-    if (aValue > bValue) {
-      return sortConfig.direction === 'asc' ? 1 : -1;
-    }
-    return 0;
-  });
-  
-  // Request sort
-  const requestSort = (key: keyof Diamond) => {
-    setSortConfig(prevConfig => ({
-      key,
-      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc',
-    }));
+
+  const handleAdd = () => {
+    setSelectedDiamond(null);
+    setShowEditDialog(true);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between">
-        <h2 className="text-lg font-semibold">Diamond Inventory</h2>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by kapan or client..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Sort By</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => requestSort('entryDate')}>
-                Date {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => requestSort('numberOfDiamonds')}>
-                Count {sortConfig.key === 'numberOfDiamonds' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => requestSort('weightInKarats')}>
-                Weight {sortConfig.key === 'weightInKarats' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => requestSort('totalValue')}>
-                Value {sortConfig.key === 'totalValue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div>
+      <div className="flex items-center justify-between py-4">
+        <div className="flex items-center">
+          <Search className="w-4 h-4 text-muted-foreground absolute ml-3" />
+          <Input
+            placeholder="Search diamonds..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 max-w-xs"
+          />
         </div>
+        <Button onClick={handleAdd}>
+          <Plus className="mr-2 h-4 w-4" /> Add Diamond
+        </Button>
       </div>
       
-      <div className="border rounded-md">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[120px]">Date</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Kapan ID</TableHead>
-              <TableHead className="text-right">Count</TableHead>
-              <TableHead className="text-right">Weight (K)</TableHead>
+              {!hideClientColumn && <TableHead>Client</TableHead>}
               <TableHead>Category</TableHead>
-              <TableHead className="text-right">Value</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="text-right">Number</TableHead>
+              <TableHead className="text-right">Weight (Karats)</TableHead>
+              <TableHead className="text-right">Total Value</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedDiamonds.length > 0 ? (
-              sortedDiamonds.map((diamond) => (
+            {filteredDiamonds.map((diamond) => {
+              const client = clients.find(c => c.id === diamond.clientId);
+              
+              return (
                 <TableRow key={diamond.id}>
+                  {!hideClientColumn && (
+                    <TableCell className="font-medium">{client?.name || 'Unknown'}</TableCell>
+                  )}
                   <TableCell>
-                    {format(new Date(diamond.entryDate), 'dd MMM yyyy')}
+                    <Badge variant={diamond.category === '4P Plus' ? 'default' : 'outline'}>
+                      {diamond.category}
+                    </Badge>
                   </TableCell>
-                  <TableCell>{getClientName(diamond.clientId)}</TableCell>
-                  <TableCell>{diamond.kapanId}</TableCell>
                   <TableCell className="text-right">{diamond.numberOfDiamonds}</TableCell>
                   <TableCell className="text-right">{diamond.weightInKarats.toFixed(2)}</TableCell>
-                  <TableCell>{diamond.category}</TableCell>
                   <TableCell className="text-right font-medium">
-                    ${diamond.totalValue.toLocaleString()}
+                    ₹{diamond.totalValue.toLocaleString('en-IN')}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View details</DropdownMenuItem>
-                        <DropdownMenuItem>Edit entry</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => navigate(`/diamonds/${diamond.id}`)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(diamond.id)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Diamond
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
+              );
+            })}
+            {filteredDiamonds.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
-                  {searchQuery ? "No diamonds match your search" : "No diamonds added yet"}
+                <TableCell colSpan={hideClientColumn ? 5 : 6} className="h-24 text-center">
+                  No diamonds found.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      <EditDiamondDialog
+        diamond={selectedDiamond ? diamonds.find(d => d.id === selectedDiamond) : undefined}
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+      />
     </div>
   );
 };

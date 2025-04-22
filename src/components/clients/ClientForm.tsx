@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
@@ -158,7 +157,7 @@ const ClientForm = () => {
                   id="4p-plus-rate"
                   type="number"
                   min="1"
-                  placeholder="Rate in USD"
+                  placeholder="Rate in ₹"
                   value={fourPPlusRate || ''}
                   onChange={(e) => setFourPPlusRate(Number(e.target.value))}
                   required
@@ -170,7 +169,7 @@ const ClientForm = () => {
                   id="4p-minus-rate"
                   type="number"
                   min="1"
-                  placeholder="Rate in USD"
+                  placeholder="Rate in ₹"
                   value={fourPMinusRate || ''}
                   onChange={(e) => setFourPMinusRate(Number(e.target.value))}
                   required

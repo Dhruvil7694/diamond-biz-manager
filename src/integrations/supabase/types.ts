@@ -226,6 +226,52 @@ export type Database = {
         }
         Relationships: []
       }
+      company_details: {
+        Row: {
+          account_holder_name: string
+          id: string
+          company_name: string
+          address: string
+          phone: string | null
+          email: string | null
+          gst_number: string | null
+          bank_name: string
+          account_number: string
+          ifsc_code: string
+          branch: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          address: string
+          phone?: string | null
+          email?: string | null
+          gst_number?: string | null
+          bank_name: string
+          account_number: string
+          ifsc_code: string
+          branch: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          address?: string
+          phone?: string | null
+          email?: string | null
+          gst_number?: string | null
+          bank_name?: string
+          account_number?: string
+          ifsc_code?: string
+          branch?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

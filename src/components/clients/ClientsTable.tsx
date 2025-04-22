@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { useData, Client } from '@/contexts/DataContext';
+import { useData } from '@/contexts/DataContext';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -18,121 +18,126 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { MoreVertical, Search, Edit, Eye, Plus } from 'lucide-react';
+import EditClientDialog from './EditClientDialog';
 
 const ClientsTable = () => {
   const { clients, diamonds } = useData();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const navigate = useNavigate();
 
-  // Filter clients
-  const filteredClients = clients.filter(client => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      client.name.toLowerCase().includes(searchLower) ||
-      client.company.toLowerCase().includes(searchLower) ||
-      client.contactPerson.toLowerCase().includes(searchLower) ||
-      client.email.toLowerCase().includes(searchLower)
-    );
-  });
-  
-  // Calculate business volume
-  const getClientBusinessVolume = (clientId: string): number => {
-    return diamonds
-      .filter(d => d.clientId === clientId)
-      .reduce((total, diamond) => total + diamond.totalValue, 0);
+  // Filter clients based on search term
+  const filteredClients = clients.filter(client =>
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleEdit = (clientId: string) => {
+    setSelectedClient(clientId);
+    setShowEditDialog(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedClient(null);
+    setShowEditDialog(true);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between">
-        <h2 className="text-lg font-semibold">Client List</h2>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <div>
+      <div className="flex items-center justify-between py-4">
+        <div className="flex items-center">
+          <Search className="w-4 h-4 text-muted-foreground absolute ml-3" />
           <Input
             placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 max-w-xs"
           />
         </div>
+        <Button onClick={handleAdd}>
+          <Plus className="mr-2 h-4 w-4" /> Add Client
+        </Button>
       </div>
       
-      <div className="border rounded-md">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Company</TableHead>
               <TableHead>Contact</TableHead>
-              <TableHead className="hidden md:table-cell">Email</TableHead>
               <TableHead className="text-right">Business Volume</TableHead>
-              <TableHead className="w-[80px]">Rates</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead>Rates</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredClients.length > 0 ? (
-              filteredClients.map((client) => {
-                const businessVolume = getClientBusinessVolume(client.id);
+            {filteredClients.map((client) => {
+              const businessVolume = diamonds
+                .filter(d => d.clientId === client.id)
+                .reduce((sum, d) => sum + d.totalValue, 0);
                 
-                return (
-                  <TableRow key={client.id}>
-                    <TableCell>{client.name}</TableCell>
-                    <TableCell>{client.company}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div>{client.contactPerson}</div>
-                        <div className="text-sm text-muted-foreground md:hidden">
-                          {client.email}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{client.email}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      ${businessVolume.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1.5">
-                        <Badge variant="outline" className="justify-between">
-                          <span className="font-normal mr-1">4P+:</span>
-                          <span>${client.rates.fourPPlus}</span>
-                        </Badge>
-                        <Badge variant="outline" className="justify-between">
-                          <span className="font-normal mr-1">4P-:</span>
-                          <span>${client.rates.fourPMinus}</span>
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit client</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            ) : (
+              return (
+                <TableRow key={client.id}>
+                  <TableCell className="font-medium">{client.name}</TableCell>
+                  <TableCell className="hidden md:table-cell">{client.email}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    ₹{businessVolume.toLocaleString('en-IN')}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1.5">
+                      <Badge variant="outline" className="justify-between">
+                        <span className="font-normal mr-1">4P+:</span>
+                        <span>₹{client.rates.fourPPlus}</span>
+                      </Badge>
+                      <Badge variant="outline" className="justify-between">
+                        <span className="font-normal mr-1">4P-:</span>
+                        <span>₹{client.rates.fourPMinus}</span>
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(client.id)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Client
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {filteredClients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
-                  {searchQuery ? "No clients match your search" : "No clients added yet"}
+                <TableCell colSpan={5} className="h-24 text-center">
+                  No clients found.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      <EditClientDialog
+        client={selectedClient ? clients.find(c => c.id === selectedClient) : undefined}
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+      />
     </div>
   );
 };
