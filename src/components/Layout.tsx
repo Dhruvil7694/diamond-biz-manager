@@ -1,3 +1,5 @@
+import { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
@@ -825,7 +827,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
             
-            {/* <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1">
               <ThemeToggle />
               
               <Button variant="ghost" size="icon" className="relative">
@@ -876,7 +878,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div> */}
+            </div>
           </header>
         )}
         
