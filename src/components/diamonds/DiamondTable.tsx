@@ -60,19 +60,14 @@ const DiamondTable = ({ filterClientId, hideClientColumn = false }: DiamondTable
 
   return (
     <div>
-      <div className="flex items-center justify-between py-4">
-        <div className="flex items-center">
-          <Search className="w-4 h-4 text-muted-foreground absolute ml-3" />
-          <Input
-            placeholder="Search diamonds..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 max-w-xs"
-          />
-        </div>
-        <Button onClick={handleAdd}>
-          <Plus className="mr-2 h-4 w-4" /> Add Diamond
-        </Button>
+      <div className="flex items-center relative mb-4">
+        <Search className="w-4 h-4 text-muted-foreground absolute ml-3" />
+        <Input
+          placeholder="Search diamonds..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9 max-w-xs"
+        />
       </div>
       
       <div className="rounded-md border">

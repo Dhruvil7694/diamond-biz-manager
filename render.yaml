@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: rashi4p
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run preview
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=4096" # Increase Node.js memory limit
+    autoDeploy: true
+
+routes:
+  - type: rewrite
+    source: /*
+    destination: /index.html

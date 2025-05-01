@@ -8,6 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,11 +22,12 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useForm, Controller } from 'react-hook-form';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Save, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useViewport } from '@/contexts/ViewportContext';
 import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 
 interface InvoiceFormData {
   clientId: string;
@@ -236,30 +239,157 @@ const InvoiceForm = () => {
                 </div>
 
                 <div className="grid gap-1 sm:gap-2">
-                  <Label htmlFor="issueDate" className="text-xs sm:text-sm">Invoice Date</Label>
-                  <Input
-                    id="issueDate"
-                    type="date"
-                    {...register('issueDate', { required: 'Invoice date is required' })}
-                    className={`h-8 sm:h-10 text-xs sm:text-sm ${errors.issueDate ? 'border-red-500' : ''}`}
+  <Label htmlFor="issueDate" className="text-xs sm:text-sm font-medium">Invoice Date</Label>
+  <Controller
+    control={control}
+    name="issueDate"
+    rules={{ required: "Invoice date is required" }}
+                    render={({ field }) => (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal h-8 sm:h-10 text-xs sm:text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                              !field.value && "text-muted-foreground",
+                              errors.issueDate && "border-red-500 focus:ring-red-400"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {field.value ? format(field.value, "PPP") : "Select a date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? new Date(field.value) : undefined}
+                            onSelect={(date) => field.onChange(date?.toISOString())}
+                            initialFocus
+                            className="rounded-md border bg-popover"
+                            classNames={{
+                              day: "h-10 w-10 text-center rounded-md hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground aria-selected:bg-primary aria-selected:text-primary-foreground text-foreground",
+                              day_outside: "text-muted-foreground opacity-50",
+                              day_disabled: "text-muted-foreground opacity-50",
+                              day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                              head_cell: "text-muted-foreground rounded-md w-10 font-normal text-xs",
+                              row: "flex w-full mt-2",
+                              table: "w-full border-collapse space-y-1",
+                              cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                              nav_button: "border p-1 rounded-md hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center",
+                              nav_button_previous: "absolute left-1",
+                              nav_button_next: "absolute right-1",
+                              caption: "flex justify-center pt-1 relative items-center text-sm",
+                              caption_label: "text-foreground font-medium"
+                            }}
+                          />
+                          <div className="flex items-center justify-between p-2 border-t">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => field.onChange(new Date().toISOString())}
+                              className="text-xs hover:bg-accent hover:text-accent-foreground"
+                            >
+                              Today
+                            </Button>
+                            {field.value && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => field.onChange(null)}
+                                className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   />
                   {errors.issueDate && (
-                    <p className="text-xs text-red-500">{errors.issueDate.message}</p>
+                    <p className="text-xs text-red-500 mt-1">{errors.issueDate.message}</p>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <div className="grid gap-1 sm:gap-2">
-                  <Label htmlFor="dueDate" className="text-xs sm:text-sm">Due Date</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    {...register('dueDate', { required: 'Due date is required' })}
-                    className={`h-8 sm:h-10 text-xs sm:text-sm ${errors.dueDate ? 'border-red-500' : ''}`}
+                  <Label htmlFor="dueDate" className="text-xs sm:text-sm font-medium">Due Date</Label>
+                  <Controller
+                    control={control}
+                    name="dueDate"
+                    rules={{ required: "Due date is required" }}
+                    render={({ field }) => (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal h-8 sm:h-10 text-xs sm:text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                              !field.value && "text-muted-foreground",
+                              errors.dueDate && "border-red-500 focus:ring-red-400"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {field.value ? format(field.value, "PPP") : "Select a date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? new Date(field.value) : undefined}
+                            onSelect={(date) => field.onChange(date?.toISOString())}
+                            initialFocus
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            className="rounded-md border bg-popover"
+                            classNames={{
+                              day: "h-10 w-10 text-center rounded-md hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground aria-selected:bg-primary aria-selected:text-primary-foreground text-foreground",
+                              day_outside: "text-muted-foreground opacity-50",
+                              day_disabled: "text-muted-foreground opacity-50",
+                              day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                              head_cell: "text-muted-foreground rounded-md w-10 font-normal text-xs",
+                              row: "flex w-full mt-2",
+                              table: "w-full border-collapse space-y-1",
+                              cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                              nav_button: "border p-1 rounded-md hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center",
+                              nav_button_previous: "absolute left-1",
+                              nav_button_next: "absolute right-1",
+                              caption: "flex justify-center pt-1 relative items-center text-sm",
+                              caption_label: "text-foreground font-medium"
+                            }}
+                          />
+                          <div className="flex items-center justify-between p-2 border-t">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => field.onChange(new Date().toISOString())}
+                              className="text-xs hover:bg-accent hover:text-accent-foreground"
+                            >
+                              Today
+                            </Button>
+                            {field.value && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => field.onChange(null)}
+                                className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   />
                   {errors.dueDate && (
-                    <p className="text-xs text-red-500">{errors.dueDate.message}</p>
+                    <p className="text-xs text-red-500 mt-1">{errors.dueDate.message}</p>
                   )}
                 </div>
               </div>

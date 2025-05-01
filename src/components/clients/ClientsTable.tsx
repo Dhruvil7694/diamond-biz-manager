@@ -48,8 +48,8 @@ const ClientsTable = () => {
   return (
     <div>
       <div className="flex items-center justify-between py-4">
-        <div className="flex items-center">
-          <Search className="w-4 h-4 text-muted-foreground absolute ml-3" />
+        <div className="flex items-center relative">
+          <Search className="w-4 h-4 text-muted-foreground absolute ml-3 pointer-events-none" />
           <Input
             placeholder="Search clients..."
             value={searchTerm}
