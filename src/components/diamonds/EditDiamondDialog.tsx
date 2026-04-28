@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -112,41 +112,54 @@ const EditDiamondDialog = ({ diamond, open, onOpenChange }: EditDiamondDialogPro
     }
   }, [watchClientId, clients]);
 
+  const calculateValue = useCallback(() => {
+    if (!selectedClient || watchNumberOfDiamonds <= 0 || watchWeightInKarats <= 0)
+      return;
+
+    setIsCalculating(true);
+
+    try {
+      const adjustedWeight = watchRawDamageWeight
+        ? watchWeightInKarats - (watchRawDamageWeight || 0)
+        : watchWeightInKarats;
+
+      let nextValue = 0;
+
+      if (watchCategory === '4P Plus') {
+        nextValue = adjustedWeight * selectedClient.rates.fourPPlus;
+      } else {
+        nextValue = watchNumberOfDiamonds * selectedClient.rates.fourPMinus;
+      }
+
+      setCalculatedValue(nextValue);
+      setValue('totalValue', nextValue);
+    } finally {
+      setTimeout(() => {
+        setIsCalculating(false);
+      }, 600);
+    }
+  }, [
+    selectedClient,
+    watchNumberOfDiamonds,
+    watchWeightInKarats,
+    watchRawDamageWeight,
+    watchCategory,
+    setValue,
+  ]);
+
   // Auto-calculate diamond value when relevant fields change
   useEffect(() => {
     if (selectedClient && watchNumberOfDiamonds > 0 && watchWeightInKarats > 0) {
       calculateValue();
     }
-  }, [watchClientId, watchCategory, watchNumberOfDiamonds, watchWeightInKarats, watchRawDamageWeight, selectedClient]);
-
-  const calculateValue = () => {
-    if (!selectedClient || watchNumberOfDiamonds <= 0 || watchWeightInKarats <= 0) return;
-
-    setIsCalculating(true);
-    
-    try {
-      // Adjust weight if there's damage
-      const adjustedWeight = watchRawDamageWeight ? 
-        watchWeightInKarats - (watchRawDamageWeight || 0) : 
-        watchWeightInKarats;
-      
-      // Calculate based on category
-      let calculatedValue = 0;
-      
-      if (watchCategory === '4P Plus') {
-        calculatedValue = adjustedWeight * selectedClient.rates.fourPPlus;
-      } else {
-        calculatedValue = watchNumberOfDiamonds * selectedClient.rates.fourPMinus;
-      }
-      
-      setCalculatedValue(calculatedValue);
-      setValue('totalValue', calculatedValue);
-    } finally {
-      setTimeout(() => {
-        setIsCalculating(false);
-      }, 600); // Add a slight delay to show the calculation animation
-    }
-  };
+  }, [
+    selectedClient,
+    watchNumberOfDiamonds,
+    watchWeightInKarats,
+    watchRawDamageWeight,
+    watchCategory,
+    calculateValue,
+  ]);
 
   const onSubmit = async (data: DiamondFormData) => {
     try {

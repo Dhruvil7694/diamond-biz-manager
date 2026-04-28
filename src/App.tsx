@@ -29,6 +29,7 @@ const DiamondTestComponent = lazy(() => import("./components/DiamondTestComponen
 
 // Existing components
 const Settings = lazy(() => import("./components/Settings"));
+const Profile = lazy(() => import("./pages/Profile"));
 const Help = lazy(() => import("./components/Help"));
 
 // New Components
@@ -103,6 +104,8 @@ const AppRoutes = () => {
         <Route path="/invoices/:id" element={<InvoiceDetail />} />        
         <Route path="/invoices/:id/edit" element={<InvoiceForm />} />
         
+        <Route path="/profile" element={<Profile />} />
+
         {/* Settings Routes */}
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/company" element={<CompanyDetailsManagement />} />  {/* Company settings */}

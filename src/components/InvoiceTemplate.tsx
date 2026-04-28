@@ -21,7 +21,7 @@ interface DiamondEntry {
 
 
 interface ClientDetails {
-  isPremium: any;
+  isPremium?: boolean;
   name: string;
   company?: string;
   contactPerson?: string;

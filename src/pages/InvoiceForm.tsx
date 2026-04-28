@@ -158,9 +158,11 @@ const InvoiceForm = () => {
         toast.success("Invoice created successfully");
       }
       navigate('/invoices');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error submitting invoice:", error);
-      toast.error(error.message || "Failed to save invoice");
+      const msg =
+        error instanceof Error ? error.message : "Failed to save invoice";
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

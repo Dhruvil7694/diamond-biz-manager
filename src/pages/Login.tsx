@@ -12,20 +12,25 @@ import { useViewport } from '@/contexts/ViewportContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { motion, AnimatePresence } from 'framer-motion';
+import { validateLoginIdentifier } from '@/components/validators/LoginIdentifierValidator';
+import { validateLoginPassword } from '@/components/validators/PasswordValidator';
 
 // Form validation types
 type ValidationError = {
-  username?: string;
+  identifier?: string;
   password?: string;
 };
 
+const REMEMBER_IDENTIFIER_KEY = 'rememberedLoginIdentifier';
+const LEGACY_REMEMBER_USERNAME_KEY = 'rememberedUsername';
+
 const Login = () => {
   // State management
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<ValidationError>({});
-  const [touched, setTouched] = useState({ username: false, password: false });
+  const [touched, setTouched] = useState({ identifier: false, password: false });
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -36,18 +41,19 @@ const Login = () => {
   useTheme();
   
   // Refs
-  const usernameInputRef = useRef<HTMLInputElement>(null);
+  const identifierInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus on username input when component mounts
+  // Focus identifier field when component mounts; restore remembered login id
   useEffect(() => {
-    if (usernameInputRef.current) {
-      usernameInputRef.current.focus();
+    if (identifierInputRef.current) {
+      identifierInputRef.current.focus();
     }
-    
-    // Check for stored username if user had "remember me" checked previously
-    const storedUsername = localStorage.getItem('rememberedUsername');
-    if (storedUsername) {
-      setUsername(storedUsername);
+
+    const stored =
+      localStorage.getItem(REMEMBER_IDENTIFIER_KEY) ??
+      localStorage.getItem(LEGACY_REMEMBER_USERNAME_KEY);
+    if (stored) {
+      setIdentifier(stored);
       setRememberMe(true);
     }
   }, []);
@@ -59,39 +65,25 @@ const Login = () => {
     }
   }, [user, navigate]);
 
-  // Username validation
-  const validateUsername = (value: string): string | undefined => {
-    if (!value) return 'Username is required';
-    return undefined;
-  };
-
-  // Password validation
-  const validatePassword = (value: string): string | undefined => {
-    if (!value) return 'Password is required';
-    if (value.length < 6) return 'Password must be at least 6 characters';
-    return undefined;
-  };
-
   // Handle input blur for validation
-  const handleBlur = (field: 'username' | 'password') => {
+  const handleBlur = (field: 'identifier' | 'password') => {
     setTouched({ ...touched, [field]: true });
-    
-    if (field === 'username') {
-      const usernameError = validateUsername(username);
-      setErrors(prev => ({ ...prev, username: usernameError }));
-    } else if (field === 'password') {
-      const passwordError = validatePassword(password);
-      setErrors(prev => ({ ...prev, password: passwordError }));
+
+    if (field === 'identifier') {
+      const idError = validateLoginIdentifier(identifier);
+      setErrors((prev) => ({ ...prev, identifier: idError }));
+    } else {
+      const passwordError = validateLoginPassword(password);
+      setErrors((prev) => ({ ...prev, password: passwordError }));
     }
   };
 
-  // Handle input change
-  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setUsername(value);
-    if (touched.username) {
-      const usernameError = validateUsername(value);
-      setErrors(prev => ({ ...prev, username: usernameError }));
+    setIdentifier(value);
+    if (touched.identifier) {
+      const idError = validateLoginIdentifier(value);
+      setErrors((prev) => ({ ...prev, identifier: idError }));
     }
   };
 
@@ -99,8 +91,8 @@ const Login = () => {
     const value = e.target.value;
     setPassword(value);
     if (touched.password) {
-      const passwordError = validatePassword(value);
-      setErrors(prev => ({ ...prev, password: passwordError }));
+      const passwordError = validateLoginPassword(value);
+      setErrors((prev) => ({ ...prev, password: passwordError }));
     }
   };
 
@@ -109,35 +101,34 @@ const Login = () => {
     e.preventDefault();
     
     // Set all fields as touched for validation
-    setTouched({ username: true, password: true });
-    
-    // Validate inputs
-    const usernameError = validateUsername(username);
-    const passwordError = validatePassword(password);
-    const newErrors = { username: usernameError, password: passwordError };
+    setTouched({ identifier: true, password: true });
+
+    const identifierError = validateLoginIdentifier(identifier);
+    const passwordError = validateLoginPassword(password);
+    const newErrors = { identifier: identifierError, password: passwordError };
     setErrors(newErrors);
-    
-    // Return if there are errors
-    if (usernameError || passwordError) {
+
+    if (identifierError || passwordError) {
       toast.error('Please fix the errors in the form');
       return;
     }
-    
-    // Store username if "remember me" is checked
+
     if (rememberMe) {
-      localStorage.setItem('rememberedUsername', username);
+      localStorage.setItem(REMEMBER_IDENTIFIER_KEY, identifier.trim());
+      localStorage.removeItem(LEGACY_REMEMBER_USERNAME_KEY);
     } else {
-      localStorage.removeItem('rememberedUsername');
+      localStorage.removeItem(REMEMBER_IDENTIFIER_KEY);
+      localStorage.removeItem(LEGACY_REMEMBER_USERNAME_KEY);
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      // Handle login with case-insensitive username
-      const normalizedUsername = username.toLowerCase();
-      const success = await login(normalizedUsername, password);
+      const trimmedId = identifier.trim();
+      const normalized =
+        trimmedId.includes('@') ? trimmedId.toLowerCase() : trimmedId;
+      const success = await login(normalized, password);
       if (success) {
-        toast.success('Login successful');
         navigate('/dashboard');
       }
     } catch (error) {
@@ -269,9 +260,11 @@ const Login = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <Label htmlFor="username" className="text-sm dark:text-gray-300">Username</Label>
+                  <Label htmlFor="login-identifier" className="text-sm dark:text-gray-300">
+                    Email or username
+                  </Label>
                   <AnimatePresence>
-                    {touched.username && !errors.username && username && (
+                    {touched.identifier && !errors.identifier && identifier && (
                       <motion.span
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -285,39 +278,41 @@ const Login = () => {
                 </div>
                 <div className="relative">
                   <Input
-                    id="username"
+                    id="login-identifier"
                     type="text"
-                    placeholder={isMobile ? "Username" : "Enter your username"}
-                    value={username}
-                    onChange={handleUsernameChange}
-                    onBlur={() => handleBlur('username')}
-                    ref={usernameInputRef}
+                    name="login"
+                    autoComplete="username"
+                    placeholder={isMobile ? "Email or username" : "you@example.com or hiren"}
+                    value={identifier}
+                    onChange={handleIdentifierChange}
+                    onBlur={() => handleBlur('identifier')}
+                    ref={identifierInputRef}
                     required
-                    aria-invalid={errors.username ? 'true' : 'false'}
-                    aria-describedby={errors.username ? "username-error" : undefined}
+                    aria-invalid={errors.identifier ? 'true' : 'false'}
+                    aria-describedby={errors.identifier ? 'login-identifier-error' : undefined}
                     className={`bg-white dark:bg-gray-700/70 border focus-visible:ring-diamond-500 h-11 text-sm dark:text-white dark:placeholder:text-gray-400 transition-all ${
-                      touched.username && errors.username 
-                        ? 'border-red-500 dark:border-red-400 pr-10' 
-                        : touched.username && !errors.username && username 
-                          ? 'border-green-500 dark:border-green-400' 
+                      touched.identifier && errors.identifier
+                        ? 'border-red-500 dark:border-red-400 pr-10'
+                        : touched.identifier && !errors.identifier && identifier
+                          ? 'border-green-500 dark:border-green-400'
                           : 'border-gray-200 dark:border-gray-600 hover:border-diamond-300 dark:hover:border-diamond-500/50'
                     }`}
                   />
-                  {touched.username && errors.username && (
+                  {touched.identifier && errors.identifier && (
                     <AlertCircle className="h-5 w-5 text-red-500 absolute right-3 top-1/2 transform -translate-y-1/2" />
                   )}
                 </div>
                 <AnimatePresence>
-                  {touched.username && errors.username && (
+                  {touched.identifier && errors.identifier && (
                     <motion.p
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.2 }}
-                      id="username-error"
+                      id="login-identifier-error"
                       className="text-red-500 dark:text-red-400 text-xs mt-1"
                     >
-                      {errors.username}
+                      {errors.identifier}
                     </motion.p>
                   )}
                 </AnimatePresence>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
-import { LogOut, Save, User, Upload } from 'lucide-react';
+import { LogOut, Save, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ProfileSettings = () => {
@@ -17,15 +17,28 @@ const ProfileSettings = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Profile state
   const [profile, setProfile] = useState({
-    name: (user as any)?.name || 'Hiren Patel',
-    email: (user as any)?.email || 'hiren.patel@example.com',
-    phone: (user as any)?.phone || '+1 123-456-7890',
-    position: (user as any)?.position || 'Diamond Merchant',
-    company: (user as any)?.company || 'Diamond Business Management Systems',
-    avatar: (user as any)?.avatar || '',
+    name: '',
+    email: '',
+    username: '',
+    phone: '',
+    position: '',
+    company: '',
+    avatar: '',
   });
+
+  useEffect(() => {
+    if (!user) return;
+    setProfile({
+      name: user.name || '',
+      email: user.email || '',
+      username: user.username ?? '',
+      phone: user.phone ?? '',
+      position: user.position ?? '',
+      company: user.company ?? '',
+      avatar: user.avatar_url ?? '',
+    });
+  }, [user]);
   
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -63,30 +76,23 @@ const ProfileSettings = () => {
     setIsLoading(true);
     
     try {
-      // In a real app, you would upload the avatar file to a server
-      // and update the profile with the returned URL
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Update profile in auth context
-      if (typeof updateProfile === 'function') {
-        await updateProfile({
-          ...profile,
-          // In a real implementation, this would be the URL returned from the server
-          avatar: profile.avatar
-        });
-      }
+      await updateProfile({
+        name: profile.name,
+        phone: profile.phone,
+        position: profile.position,
+        company: profile.company,
+        avatar: profile.avatar,
+      });
       
       toast({
-        title: "Profile Updated",
-        description: "Your profile has been successfully updated.",
+        title: "Profile updated",
+        description: "Saved to your account.",
         variant: "default",
       });
     } catch (error) {
       toast({
-        title: "Update Failed",
-        description: "There was a problem updating your profile.",
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Could not save profile.",
         variant: "destructive",
       });
     } finally {
@@ -95,13 +101,15 @@ const ProfileSettings = () => {
   };
   
   const resetProfile = () => {
+    if (!user) return;
     setProfile({
-      name: (user as any)?.name || 'Hiren Patel',
-      email: (user as any)?.email || 'hiren.patel@example.com',
-      phone: (user as any)?.phone || '+1 123-456-7890',
-      position: (user as any)?.position || 'Diamond Merchant',
-      company: (user as any)?.company || 'Diamond Business Management Systems',
-      avatar: (user as any)?.avatar || '',
+      name: user.name || '',
+      email: user.email || '',
+      username: user.username ?? '',
+      phone: user.phone ?? '',
+      position: user.position ?? '',
+      company: user.company ?? '',
+      avatar: user.avatar_url ?? '',
     });
     setAvatarFile(null);
   };
@@ -141,12 +149,26 @@ const ProfileSettings = () => {
                   name="email" 
                   type="email" 
                   value={profile.email} 
-                  onChange={handleProfileChange} 
+                  onChange={handleProfileChange}
+                  disabled
+                  title="Email is tied to your account"
                 />
               </div>
             </div>
-            
+
             <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="profile-username">Username</Label>
+                <Input
+                  id="profile-username"
+                  name="username"
+                  value={profile.username}
+                  disabled
+                  placeholder="Not set"
+                  title="Username is set by your administrator"
+                  className="bg-muted/50"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input 
@@ -156,6 +178,9 @@ const ProfileSettings = () => {
                   onChange={handleProfileChange} 
                 />
               </div>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="position">Position</Label>
                 <Input 
@@ -165,16 +190,15 @@ const ProfileSettings = () => {
                   onChange={handleProfileChange} 
                 />
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input 
-                id="company" 
-                name="company" 
-                value={profile.company} 
-                onChange={handleProfileChange} 
-              />
+              <div className="space-y-2">
+                <Label htmlFor="company">Company</Label>
+                <Input 
+                  id="company" 
+                  name="company" 
+                  value={profile.company} 
+                  onChange={handleProfileChange} 
+                />
+              </div>
             </div>
           </CardContent>
           <CardFooter className="justify-between">

@@ -36,6 +36,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import InvoiceTemplate from '../components/InvoiceTemplate';
+import type {
+  Invoice as ApiInvoice,
+  Diamond,
+  CompanyDetails,
+} from '@/contexts/DataContext';
 import {
   Dialog,
   DialogContent,
@@ -55,16 +60,55 @@ import {
 } from "@/components/ui/alert-dialog";
 import PaymentMethodDialog, { PAYMENT_METHODS } from '../components/PaymentMethodDialog';
 
+/** Shape passed to `InvoiceTemplate` after loading `CompleteInvoice` */
+type InvoicePreviewModel = {
+  id: string;
+  invoiceNumber: string;
+  date: string;
+  dueDate: string;
+  clientId: string;
+  clientName: string;
+  clientDetails: {
+    name: string;
+    company: string;
+    contactPerson: string;
+    phone: string;
+    email: string;
+    rates: { fourPPlus: number; fourPMinus: number };
+    paymentTerms?: string;
+  };
+  company: CompanyDetails;
+  amount: number;
+  status: string;
+  paymentDate?: string | null;
+  paymentMethod?: string | null;
+  entries: Array<{
+    id: string;
+    kapanId: string;
+    weight: number;
+    numberOfDiamonds: number;
+    category: string;
+    rate: number;
+    totalValue: number;
+  }>;
+};
+
 const Invoices = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] =
+    useState<InvoicePreviewModel | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<any>(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<ApiInvoice | null>(
+    null
+  );
   const { isMobile, isTablet } = useViewport();
-  const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] = useState(false);
-  const [invoiceToUpdate, setInvoiceToUpdate] = useState<any>(null);
+  const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] =
+    useState(false);
+  const [invoiceToUpdate, setInvoiceToUpdate] = useState<ApiInvoice | null>(
+    null
+  );
   
   // Get database data from context
   const { invoices, updateInvoice, deleteInvoice, clients, diamonds, getCompleteInvoice } = useData();
@@ -78,7 +122,11 @@ const Invoices = () => {
   );
   
   // Handle payment status change
-  const handlePaymentStatusChange = async (invoice: any, newStatus: string, paymentMethod?: string) => {
+  const handlePaymentStatusChange = async (
+    invoice: ApiInvoice,
+    newStatus: 'pending' | 'paid',
+    paymentMethod?: string
+  ) => {
     try {
       // If we're marking as paid and no payment method provided, open the dialog
       if (newStatus === 'paid' && !paymentMethod) {
@@ -110,7 +158,7 @@ const Invoices = () => {
   };
   
   // Handle delete
-  const handleDeleteClick = (invoice: any) => {
+  const handleDeleteClick = (invoice: ApiInvoice) => {
     setInvoiceToDelete(invoice);
     setDeleteDialogOpen(true);
   };
@@ -130,7 +178,7 @@ const Invoices = () => {
     }
   };
 
-  const downloadPdf = async (invoice: any) => {
+  const downloadPdf = async (invoice: InvoicePreviewModel | ApiInvoice) => {
     // Get complete invoice data
     const completeInvoice = await getCompleteInvoice(invoice.id);
     if (!completeInvoice) {
@@ -161,7 +209,7 @@ const Invoices = () => {
     };
     
     // Create diamond entries HTML
-    const diamondRows = completeInvoice.diamondDetails.map((diamond: any, index: number) => `
+    const diamondRows = completeInvoice.diamondDetails.map((diamond: Diamond, index: number) => `
       <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
         <td class="px-3 py-2 text-sm text-center">${index + 1}</td>
         <td class="px-3 py-2 text-sm font-medium">${diamond.id}</td>
@@ -421,15 +469,14 @@ const Invoices = () => {
                   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
                   
                   if (isMobile) {
-                    // For mobile devices, show a message to use the save as PDF option
-                    alert('Please use the "Save as PDF" option in your browser\'s print menu');
+                    alert("Please use Save as PDF from your browser's print dialog.");
                   }
                   
                   // Trigger the print dialog
                   window.print();
                 } catch (error) {
                   console.error('Error triggering print:', error);
-                  alert('There was an error trying to print. Please try using your browser\'s print function.');
+                  alert("Print failed. Try your browser's Print option again.");
                 }
               }, 1000);
             };
@@ -496,7 +543,7 @@ const Invoices = () => {
   };
 
   // Open preview dialog with the selected invoice
-  const openPreview = async (invoice: any) => {
+  const openPreview = async (invoice: ApiInvoice) => {
     try {
       // Get complete invoice data
       const completeInvoice = await getCompleteInvoice(invoice.id);
@@ -529,7 +576,7 @@ const Invoices = () => {
         amount: completeInvoice.totalAmount,
         status: completeInvoice.status,
         paymentDate: completeInvoice.paymentDate,
-        entries: completeInvoice.diamondDetails.map((diamond: any) => ({
+        entries: completeInvoice.diamondDetails.map((diamond: Diamond) => ({
           id: diamond.id,
           kapanId: diamond.kapanId || 'N/A',
           weight: diamond.weightInKarats,
@@ -551,7 +598,7 @@ const Invoices = () => {
   };
 
   // Render mobile row card for invoice
-  const renderMobileInvoiceCard = (invoice: any) => {
+  const renderMobileInvoiceCard = (invoice: ApiInvoice) => {
     const client = clients.find(c => c.id === invoice.clientId);
     const clientName = client?.name || 'Unknown Client';
     const statusDetails = getStatusDetails(invoice.status, invoice.dueDate, invoice.paymentMethod);

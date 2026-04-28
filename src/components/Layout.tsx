@@ -130,6 +130,68 @@ const projectShortcuts = [
   }
 ];
 
+type SidebarMenuItem = {
+  name: string;
+  path: string;
+  icon: React.ReactNode;
+  description: string;
+};
+
+/** Stable references — avoids new array identity each render (useMemo deps). */
+const MAIN_MENU_ITEMS: SidebarMenuItem[] = [
+  {
+    name: 'Dashboard',
+    path: '/dashboard',
+    icon: <LayoutDashboard className="w-5 h-5" />,
+    description: 'Overview of your diamond business'
+  },
+  {
+    name: 'Diamond Entry',
+    path: '/diamonds',
+    icon: <Gem className="w-5 h-5" />,
+    description: 'Manage diamond inventory'
+  },
+  {
+    name: 'Clients',
+    path: '/clients',
+    icon: <Users className="w-5 h-5" />,
+    description: 'Client management and details'
+  },
+  {
+    name: 'Invoices',
+    path: '/invoices',
+    icon: <FileText className="w-5 h-5" />,
+    description: 'Billing and payments'
+  },
+  {
+    name: 'Analytics',
+    path: '/analytics',
+    icon: <BarChart className="w-5 h-5" />,
+    description: 'Business insights and reports'
+  },
+];
+
+const SECONDARY_MENU_ITEMS: SidebarMenuItem[] = [
+  {
+    name: 'Settings',
+    path: '/settings',
+    icon: <Settings className="w-5 h-5" />,
+    description: 'System preferences'
+  },
+  {
+    name: 'System Status',
+    path: '/settings/system',
+    icon: <Activity className="w-5 h-5" />,
+    description: 'Monitor system resources'
+  },
+  {
+    name: 'Help & Support',
+    path: '/help',
+    icon: <HelpCircle className="w-5 h-5" />,
+    description: 'Get assistance'
+  },
+];
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -236,67 +298,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const mainMenuItems = [
-    {
-      name: 'Dashboard',
-      path: '/dashboard',
-      icon: <LayoutDashboard className="w-5 h-5" />,
-      description: 'Overview of your diamond business'
-    },
-    {
-      name: 'Diamond Entry',
-      path: '/diamonds',
-      icon: <Gem className="w-5 h-5" />,
-      description: 'Manage diamond inventory'
-    },
-    {
-      name: 'Clients',
-      path: '/clients',
-      icon: <Users className="w-5 h-5" />,
-      description: 'Client management and details'
-    },
-    {
-      name: 'Invoices',
-      path: '/invoices',
-      icon: <FileText className="w-5 h-5" />,
-      description: 'Billing and payments'
-    },
-    {
-      name: 'Analytics',
-      path: '/analytics',
-      icon: <BarChart className="w-5 h-5" />,
-      description: 'Business insights and reports'
-    },
-  ];
-
-  // Secondary menu items
-  const secondaryMenuItems = [
-    {
-      name: 'Settings',
-      path: '/settings',
-      icon: <Settings className="w-5 h-5" />,
-      description: 'System preferences'
-    },
-    {
-      name: 'System Status',
-      path: '/settings/system',
-      icon: <Activity className="w-5 h-5" />,
-      description: 'Monitor system resources'
-    },
-    {
-      name: 'Help & Support',
-      path: '/help',
-      icon: <HelpCircle className="w-5 h-5" />,
-      description: 'Get assistance'
-    },
-  ];
-
   // Get current page name
   const currentPageName = useMemo(() => {
-    const matchedItem = mainMenuItems.find(item => item.path === location.pathname) || 
-                        secondaryMenuItems.find(item => item.path === location.pathname);
+    const matchedItem = MAIN_MENU_ITEMS.find(item => item.path === location.pathname) || 
+                        SECONDARY_MENU_ITEMS.find(item => item.path === location.pathname);
     return matchedItem?.name || 'Dashboard';
-  }, [location.pathname, mainMenuItems, secondaryMenuItems]);
+  }, [location.pathname]);
 
   // Filter menu items by search query
   const filteredMenuItems = useMemo(() => {
@@ -304,16 +311,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const lowerQuery = searchQuery.toLowerCase();
     
     return [
-      ...mainMenuItems.filter(item => 
+      ...MAIN_MENU_ITEMS.filter(item => 
         item.name.toLowerCase().includes(lowerQuery) || 
         item.description.toLowerCase().includes(lowerQuery)
       ),
-      ...secondaryMenuItems.filter(item => 
+      ...SECONDARY_MENU_ITEMS.filter(item => 
         item.name.toLowerCase().includes(lowerQuery) || 
         item.description.toLowerCase().includes(lowerQuery)
       )
     ];
-  }, [searchQuery, mainMenuItems, secondaryMenuItems]);
+  }, [searchQuery]);
 
   const markAllNotificationsAsRead = () => {
     setUnreadNotifications(0);
@@ -325,7 +332,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Get user name (specific to our custom user implementation)
   const getUserDisplayName = () => {
-    return (user as any).name || 'Hiren Patel';
+    if (user && 'name' in user && user.name) return String(user.name);
+    return 'User';
   };
 
   // Get initials for avatar
@@ -494,7 +502,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Main
               </h2>
               <ul className="space-y-1">
-                {mainMenuItems.map((item) => (
+                {MAIN_MENU_ITEMS.map((item) => (
                   <TooltipProvider key={item.path}>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -588,7 +596,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Preferences
               </h2>
               <ul className="space-y-1">
-                {secondaryMenuItems.map((item) => (
+                {SECONDARY_MENU_ITEMS.map((item) => (
                   <TooltipProvider key={item.path}>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -666,7 +674,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </Avatar>
                     <p className="font-medium">{getUserDisplayName()}</p>
                     <p className="text-xs text-muted-foreground dark:text-gray-400">
-                      {(user as any).email || 'hiren.patel@example.com'}
+                      {user?.email ?? ""}
                     </p>
                     <Button variant="outline" size="sm" className="mt-2 w-full text-xs" onClick={() => navigate('/profile')}>
                       Manage Account
@@ -674,7 +682,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    {mainMenuItems.map((item) => (
+                    {MAIN_MENU_ITEMS.map((item) => (
                       <DropdownMenuItem key={item.path} asChild>
                         <Link to={item.path} className="cursor-pointer">
                           {item.icon}
@@ -710,7 +718,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   >
                     <p className="font-medium text-sm whitespace-nowrap dark:text-white">{getUserDisplayName()}</p>
                     <p className="text-xs text-muted-foreground dark:text-gray-400 truncate max-w-[160px]">
-                      {(user as any).email || 'hiren.patel@example.com'}
+                      {user?.email ?? ""}
                     </p>
                   </motion.div>
                 )}
@@ -743,7 +751,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         </Avatar>
                         <p className="font-semibold">{getUserDisplayName()}</p>
                         <p className="text-xs text-muted-foreground dark:text-gray-400 truncate max-w-full mt-1">
-                          {(user as any).email || 'hiren.patel@example.com'}
+                          {user?.email ?? ""}
                         </p>
                         <div className="mt-3 w-full">
                           <Button 
@@ -849,7 +857,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <div className="px-3 py-2 border-b dark:border-gray-700">
                     <p className="font-medium">{getUserDisplayName()}</p>
                     <p className="text-xs text-muted-foreground dark:text-gray-400">
-                      {(user as any).email || 'hiren.patel@example.com'}
+                      {user?.email ?? ""}
                     </p>
                   </div>
                   <DropdownMenuItem onClick={() => navigate('/profile')}>
@@ -861,7 +869,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {mainMenuItems.map((item) => (
+                  {MAIN_MENU_ITEMS.map((item) => (
                     <DropdownMenuItem key={item.path} asChild>
                       <Link to={item.path} className="cursor-pointer">
                         {item.icon}
@@ -900,7 +908,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </h2>
               
               <nav className="hidden md:flex ml-8 space-x-1">
-                {mainMenuItems.slice(0, 3).map((item) => (
+                {MAIN_MENU_ITEMS.slice(0, 3).map((item) => (
                   <Button
                     key={item.path}
                     variant={location.pathname === item.path ? "secondary" : "ghost"}
@@ -926,7 +934,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    {mainMenuItems.slice(3).map((item) => (
+                    {MAIN_MENU_ITEMS.slice(3).map((item) => (
                       <DropdownMenuItem key={item.path} asChild>
                         <Link to={item.path} className="cursor-pointer">
                           {item.icon}
@@ -1108,7 +1116,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div className="px-2 py-3 border-t dark:border-gray-700">
                   <h4 className="px-2 text-xs font-medium text-muted-foreground mb-2">Recently Visited</h4>
                   <div className="space-y-1">
-                    {mainMenuItems.slice(0, 4).map((item) => (
+                    {MAIN_MENU_ITEMS.slice(0, 4).map((item) => (
                       <div 
                         key={item.path} 
                         className="px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer flex items-center"

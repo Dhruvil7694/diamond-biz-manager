@@ -721,7 +721,7 @@ const Analytics = () => {
                     <XAxis dataKey="month" stroke={isDarkMode ? "#9ca3af" : "#374151"} />
                     <YAxis stroke={isDarkMode ? "#9ca3af" : "#374151"} />
                     <Tooltip 
-                      formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(2) : value} karats`, '']}
+                      formatter={(value: number | string) => [`${typeof value === 'number' ? value.toFixed(2) : String(value)} karats`, '']}
                       contentStyle={{ backgroundColor: isDarkMode ? '#1f2937' : 'white', borderColor: isDarkMode ? '#374151' : '#dddddd' }}
                       labelStyle={{ color: isDarkMode ? 'white' : 'black' }}
                       itemStyle={{ color: isDarkMode ? 'white' : 'black' }}

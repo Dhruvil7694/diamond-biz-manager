@@ -162,6 +162,7 @@ export type Database = {
           issue_date: string
           notes: string | null
           payment_date: string | null
+          payment_method: string | null
           status: string
           total_amount: number
           updated_at: string
@@ -175,6 +176,7 @@ export type Database = {
           issue_date?: string
           notes?: string | null
           payment_date?: string | null
+          payment_method?: string | null
           status: string
           total_amount: number
           updated_at?: string
@@ -188,6 +190,7 @@ export type Database = {
           issue_date?: string
           notes?: string | null
           payment_date?: string | null
+          payment_method?: string | null
           status?: string
           total_amount?: number
           updated_at?: string
@@ -251,6 +254,7 @@ export type Database = {
           gst_number?: string | null
           bank_name: string
           account_number: string
+          account_holder_name: string
           ifsc_code: string
           branch: string
           created_at?: string
@@ -265,6 +269,7 @@ export type Database = {
           gst_number?: string | null
           bank_name?: string
           account_number?: string
+          account_holder_name?: string
           ifsc_code?: string
           branch?: string
           created_at?: string

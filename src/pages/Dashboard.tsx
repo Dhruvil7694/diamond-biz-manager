@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -1009,9 +1009,9 @@ const Dashboard = () => {
     [selectedClient, clients]
   );
   
-  // Calculate 30-day rate trend 
-  const calculateRateTrend = (clientId, category) => {
-    // Simulate rate history data (this would come from your backend in a real app)
+  // Calculate 30-day rate trend (simulated history — stable hook deps via useCallback)
+  const calculateRateTrend = useCallback(
+    (clientId: string, category: '4P Plus' | '4P Minus') => {
     const simulateHistory = () => {
       const currentRate = category === '4P Plus' 
         ? clientId === 'all' 
@@ -1055,10 +1055,12 @@ const Dashboard = () => {
       change: percentChange.toFixed(1),
       direction: percentChange >= 0 ? 'up' : 'down'
     };
-  };
+  },
+    [clientRates, selectedClient]
+  );
   
   // Past trend data based on timeframe and selected client
-  const generateDateData = () => {
+  const trendData = useMemo(() => {
     const data = [];
     for (let i = 0; i < days; i++) {
       const date = new Date();
@@ -1088,9 +1090,7 @@ const Dashboard = () => {
       });
     }
     return data.reverse();
-  };
-  
-  const trendData = useMemo(() => generateDateData(), [relevantDiamonds, relevantInvoices, days]);
+  }, [relevantDiamonds, relevantInvoices, days, isMobile]);
   
   // Adjust number of data points for mobile
   const getResponsiveTrendData = () => {
@@ -1104,14 +1104,14 @@ const Dashboard = () => {
   };
   
   // Rate trends
-  const fourPPlusTrend = useMemo(() => 
-    calculateRateTrend(selectedClientId, '4P Plus'),
-    [selectedClientId, clientRates.fourPPlus]
+  const fourPPlusTrend = useMemo(
+    () => calculateRateTrend(selectedClientId, '4P Plus'),
+    [calculateRateTrend, selectedClientId]
   );
   
-  const fourPMinusTrend = useMemo(() => 
-    calculateRateTrend(selectedClientId, '4P Minus'),
-    [selectedClientId, clientRates.fourPMinus]
+  const fourPMinusTrend = useMemo(
+    () => calculateRateTrend(selectedClientId, '4P Minus'),
+    [calculateRateTrend, selectedClientId]
   );
   
   // Pie chart colors - adjust for dark mode
@@ -1120,7 +1120,7 @@ const Dashboard = () => {
     : ['#4f46e5', '#818cf8', '#6366f1', '#a5b4fc', '#c7d2fe'];
 
   // Responsive chart heights
-  const getChartHeight = (defaultHeight) => {
+  const getChartHeight = (defaultHeight: number) => {
     if (isMobile) return defaultHeight * 0.8;
     if (isTablet) return defaultHeight * 0.9;
     return defaultHeight;

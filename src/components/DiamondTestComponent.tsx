@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { apiJson } from '@/api/http';
 
 const DiamondTestComponent = () => {
   const { diamonds, clients, invoices } = useData();
@@ -20,33 +20,16 @@ const DiamondTestComponent = () => {
     setError(null);
     
     try {
-      // 1. Fetch invoice items
-      const { data: items, error: itemsError } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', invoiceId);
-      
-      if (itemsError) throw itemsError;
-      setInvoiceItems(items || []);
-      
-      if (items?.length) {
-        // 2. Get diamond IDs from items
-        const diamondIds = items.map(item => item.diamond_id);
-        
-        // 3. Fetch those diamonds directly
-        const { data: diamondsData, error: diamondsError } = await supabase
-          .from('diamonds')
-          .select('*')
-          .in('id', diamondIds);
-        
-        if (diamondsError) throw diamondsError;
-        setDirectDiamonds(diamondsData || []);
-      } else {
-        setDirectDiamonds([]);
-      }
-    } catch (err) {
+      const { items, diamonds: diamondsData } = await apiJson<{
+        items: unknown[];
+        diamonds: unknown[];
+      }>(`/invoices/${invoiceId}/with-diamonds`);
+
+      setInvoiceItems((items as { id: string }[]) || []);
+      setDirectDiamonds(diamondsData || []);
+    } catch (err: unknown) {
       console.error('Error in test component:', err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -72,35 +55,27 @@ const DiamondTestComponent = () => {
         console.log(`\nChecking invoice ${invoice.invoiceNumber} (${invoice.id}):`);
         console.log("Diamond IDs in context:", invoice.diamonds || []);
         
-        // Check invoice_items directly
-        const { data: items } = await supabase
-          .from('invoice_items')
-          .select('*')
-          .eq('invoice_id', invoice.id);
-        
+        const { items, diamonds: dbDiamonds } = await apiJson<{
+          items: { diamond_id: string }[];
+          diamonds: unknown[];
+        }>(`/invoices/${invoice.id}/with-diamonds`);
+
         console.log(`Found ${items?.length || 0} invoice_items in database`);
         if (items?.length) {
-          console.log("Sample invoice item:", items[0]);
-          
-          // Check if diamonds exist for these IDs
-          const diamondIds = items.map(item => item.diamond_id);
-          const foundDiamonds = diamonds.filter(d => diamondIds.includes(d.id));
+          console.log('Sample invoice item:', items[0]);
+
+          const diamondIds = items.map((item) => item.diamond_id);
+          const foundDiamonds = diamonds.filter((d) => diamondIds.includes(d.id));
           console.log(`Found ${foundDiamonds.length}/${diamondIds.length} matching diamonds in context`);
-          
-          // Check if the database has these diamonds
-          const { data: dbDiamonds } = await supabase
-            .from('diamonds')
-            .select('*')
-            .in('id', diamondIds);
-          
+
           console.log(`Found ${dbDiamonds?.length || 0}/${diamondIds.length} matching diamonds in database`);
         }
       }
       
       console.log("\n== END DIAGNOSTIC ==");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error running diagnostics:', err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

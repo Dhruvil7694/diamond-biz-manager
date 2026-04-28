@@ -93,9 +93,10 @@ const DiamondDetail = () => {
                   <div>
                     <p className="text-sm text-muted-foreground">Rate Applied</p>
                     <p className="font-medium">
-                      ₹{(diamond.category === '4P Plus' ? 
-                        client?.rates.fourPPlus : 
-                        client?.rates.fourPMinus || 0).toLocaleString('en-IN')}
+                      ₹{(diamond.category === '4P Plus'
+                        ? client?.rates?.fourPPlus ?? 0
+                        : client?.rates?.fourPMinus ?? 0
+                      ).toLocaleString('en-IN')}
                       {diamond.category === '4P Plus' ? ' per karat' : ' per piece'}
                     </p>
                   </div>

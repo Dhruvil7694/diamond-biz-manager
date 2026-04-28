@@ -28,16 +28,51 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useData } from '@/contexts/DataContext';
+import type { Invoice, CompanyDetails } from '@/contexts/DataContext';
 import { useViewport } from '@/contexts/ViewportContext';
 import { cn } from '@/lib/utils';
 import PaymentMethodDialog, { PAYMENT_METHODS } from './PaymentMethodDialog';
 
+/** Loaded invoice shaped for InvoiceTemplate + local actions */
+interface InvoiceDetailViewState {
+  id: string;
+  invoiceNumber: string;
+  date: string;
+  dueDate: string;
+  clientId: string;
+  clientName: string;
+  clientDetails: {
+    name: string;
+    company: string;
+    contactPerson: string;
+    phone: string;
+    email: string;
+    rates: { fourPPlus: number; fourPMinus: number };
+  };
+  company: CompanyDetails;
+  amount: number;
+  status: 'pending' | 'paid';
+  paymentDate?: string | null;
+  paymentMethod?: string | null;
+  notes?: string;
+  entries: Array<{
+    id: string;
+    kapanId: string;
+    weight: number;
+    numberOfDiamonds: number;
+    category: '4P Plus' | '4P Minus';
+    rate: number;
+    totalValue: number;
+  }>;
+}
 
 const InvoiceDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [invoiceData, setInvoiceData] = useState<any>(null);
+  const [invoiceData, setInvoiceData] = useState<InvoiceDetailViewState | null>(
+    null
+  );
   const { getCompleteInvoice, updateInvoice } = useData();
   const { isMobile, isTablet } = useViewport();
   const [scrolled, setScrolled] = useState(false);
@@ -85,7 +120,9 @@ const InvoiceDetails = () => {
             amount: completeInvoice.totalAmount,
             status: completeInvoice.status,
             paymentDate: completeInvoice.paymentDate,
-            entries: completeInvoice.diamondDetails.map(diamond => ({
+            paymentMethod: completeInvoice.paymentMethod ?? null,
+            notes: completeInvoice.notes,
+            entries: completeInvoice.diamondDetails.map((diamond) => ({
               id: diamond.id,
               kapanId: diamond.kapanId,
               weight: diamond.weightInKarats,
@@ -142,19 +179,27 @@ const InvoiceDetails = () => {
     const paymentDate = newStatus === 'paid' ? new Date().toISOString() : null;
     
     try {
-      await updateInvoice({
+      const payload: Invoice = {
+        id: invoiceData.id,
+        invoiceNumber: invoiceData.invoiceNumber,
+        issueDate: invoiceData.date,
+        dueDate: invoiceData.dueDate,
+        clientId: invoiceData.clientId,
+        diamonds: invoiceData.entries.map((entry) => entry.id),
+        totalAmount: invoiceData.amount,
+        status: newStatus,
+        paymentDate: paymentDate ?? undefined,
+        paymentMethod:
+          newStatus === 'paid' ? paymentMethod ?? null : null,
+        notes: invoiceData.notes,
+      };
+      await updateInvoice(payload);
+      
+      setInvoiceData({
         ...invoiceData,
         status: newStatus,
         paymentDate,
-        paymentMethod: newStatus === 'paid' ? paymentMethod : null,
-        diamonds: invoiceData.entries.map((entry: any) => entry.id)
-      });
-      
-      setInvoiceData({ 
-        ...invoiceData, 
-        status: newStatus, 
-        paymentDate,
-        paymentMethod: newStatus === 'paid' ? paymentMethod : null 
+        paymentMethod: newStatus === 'paid' ? paymentMethod ?? null : null,
       });
       
       toast({
@@ -902,26 +947,6 @@ const InvoiceDetails = () => {
     }
   };
 
-  {invoiceData.status === 'paid' && invoiceData.paymentMethod && (
-    <div className="mb-4 px-4 py-3 bg-green-50 border border-green-100 rounded-lg shadow-sm">
-      <div className="flex items-center">
-        <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
-        <div>
-          <h3 className="font-medium text-green-800">
-            Payment Received via {PAYMENT_METHODS.find(m => m.id === invoiceData.paymentMethod)?.label || 'Other Payment Method'}
-          </h3>
-          {invoiceData.paymentDate && (
-            <p className="text-xs text-green-700 mt-0.5">
-              on {format(new Date(invoiceData.paymentDate), 'dd MMMM yyyy')}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )}
-  
-  
-  
   return (
     <div className="container-responsive mx-auto p-3 sm:p-4">
       {/* Sticky header for mobile */}
@@ -964,6 +989,30 @@ const InvoiceDetails = () => {
       
       {/* Content with proper mobile padding */}
       <div className={isMobile ? "pt-16" : ""}>
+        {invoiceData.status === 'paid' && invoiceData.paymentMethod && (
+          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-100 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
+              <div>
+                <h3 className="font-medium text-green-800">
+                  Payment Received via{' '}
+                  {PAYMENT_METHODS.find(
+                    (m) => m.id === invoiceData.paymentMethod
+                  )?.label || 'Other Payment Method'}
+                </h3>
+                {invoiceData.paymentDate && (
+                  <p className="text-xs text-green-700 mt-0.5">
+                    on{' '}
+                    {format(
+                      new Date(invoiceData.paymentDate),
+                      'dd MMMM yyyy'
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Breadcrumb Navigation - Hide on mobile */}
         <div className="hidden sm:block mb-4">
           <Breadcrumb>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { apiJson } from '@/api/http';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
@@ -77,11 +77,11 @@ export interface CompleteInvoice extends Invoice {
 }
 
 // Map types from Supabase to our application types
-type SupabaseDiamond = Database['public']['Tables']['diamonds']['Row'];
-type SupabaseClient = Database['public']['Tables']['clients']['Row'];
-type SupabaseMarketRate = Database['public']['Tables']['market_rates']['Row'];
-type SupabaseInvoice = Database['public']['Tables']['invoices']['Row'];
-type SupabaseCompanyDetails = Database['public']['Tables']['company_details']['Row'];
+type SupabaseDiamond = Database["public"]["Tables"]["diamonds"]["Row"];
+type SupabaseClient = Database["public"]["Tables"]["clients"]["Row"];
+type SupabaseMarketRate = Database["public"]["Tables"]["market_rates"]["Row"];
+type SupabaseInvoice = Database["public"]["Tables"]["invoices"]["Row"];
+type SupabaseCompanyDetails = Database["public"]["Tables"]["company_details"]["Row"];
 
 interface DataContextType {
   diamonds: Diamond[];
@@ -127,15 +127,15 @@ const mapSupabaseClientToClient = (client: SupabaseClient): Client => ({
   id: client.id,
   name: client.name,
   contactPerson: client.contact_person,
-  phone: client.phone,
-  email: client.email,
+  phone: client.phone ?? '',
+  email: client.email ?? '',
   company: client.company,
   rates: {
     fourPPlus: client.four_p_plus_rate,
     fourPMinus: client.four_p_minus_rate,
   },
-  paymentTerms: client.payment_terms,
-  notes: client.notes,
+  paymentTerms: client.payment_terms ?? '',
+  notes: client.notes ?? '',
 });
 
 const mapSupabaseMarketRateToMarketRate = (marketRate: SupabaseMarketRate): MarketRate => ({
@@ -165,65 +165,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const { session } = useAuth();
+  const { user } = useAuth();
 
-  // Function to fetch data
+  // Function to fetch data (PostgreSQL REST API — see server/index.mjs)
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch clients
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('clients')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (clientsError) throw clientsError;
-      
-      // Fetch diamonds
-      const { data: diamondsData, error: diamondsError } = await supabase
-        .from('diamonds')
-        .select('*')
-        .order('entry_date', { ascending: false });
-      
-      if (diamondsError) throw diamondsError;
-      
-      // Fetch invoices
-      const { data: invoicesData, error: invoicesError } = await supabase
-        .from('invoices')
-        .select('*')
-        .order('issue_date', { ascending: false });
-      
-      if (invoicesError) throw invoicesError;
-      
-      // Fetch market rates
-      const { data: marketRatesData, error: marketRatesError } = await supabase
-        .from('market_rates')
-        .select('*')
-        .order('date', { ascending: false });
-      
-      if (marketRatesError) throw marketRatesError;
-      
-      // Fetch invoice items to get diamond connections
-      const { data: invoiceItemsData, error: invoiceItemsError } = await supabase
-        .from('invoice_items')
-        .select('*');
-      
-      if (invoiceItemsError) throw invoiceItemsError;
-      
-      // Fetch company details with better error handling
-      let companyData = null;
-      const { data: fetchedCompanyData, error: companyError } = await supabase
-        .from('company_details')
-        .select('*')
-        .single();
-      
-      // If no data exists, use default company data instead of failing
-      if (companyError && companyError.code !== 'PGRST116') {
-        throw companyError; // Only throw if it's not a "not found" error
-      } else if (fetchedCompanyData) {
-        companyData = fetchedCompanyData;
-      } else {
-        // Default company data when none exists
+      const boot = await apiJson<{
+        clients: SupabaseClient[];
+        diamonds: SupabaseDiamond[];
+        invoices: SupabaseInvoice[];
+        invoice_items: { invoice_id: string; diamond_id: string }[];
+        market_rates: SupabaseMarketRate[];
+        company_details: SupabaseCompanyDetails | null;
+      }>('/bootstrap');
+
+      const clientsData = boot.clients;
+      const diamondsData = boot.diamonds;
+      const invoicesData = boot.invoices;
+      const invoiceItemsData = boot.invoice_items;
+      const marketRatesData = boot.market_rates;
+
+      let companyData: SupabaseCompanyDetails | null = boot.company_details;
+
+      if (!companyData) {
         companyData = {
           id: 'default',
           company_name: 'Rashi Diamonds',
@@ -231,54 +196,51 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           phone: '9879225849',
           email: 'hirenpatel29111997@gmail.com',
           gst_number: '27ABCDE1234F1Z5',
-          bank_name: 'HDFC Bank', // Corrected from swapped value
-          account_number: '12312312311', // Corrected from swapped value
-          account_holder_name: 'Hirenbhai R Patel', // New field
+          bank_name: 'HDFC Bank',
+          account_number: '12312312311',
+          account_holder_name: 'Hirenbhai R Patel',
           ifsc_code: 'BARB0KIMXXX',
           branch: 'Kim, Surat',
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
-        
       }
-      
-      // Map data to application types
+
       setClients(clientsData ? clientsData.map(mapSupabaseClientToClient) : []);
       setDiamonds(diamondsData ? diamondsData.map(mapSupabaseDiamondToDiamond) : []);
-      
-      // Process invoices with diamond data from invoice_items
+
       if (invoicesData && invoiceItemsData) {
-        const mappedInvoices = invoicesData.map(invoice => {
-          // Find all invoice items for this invoice
-          const items = invoiceItemsData.filter(item => item.invoice_id === invoice.id);
-          // Extract diamond IDs from items
-          const diamondIds = items.map(item => item.diamond_id);
-          
+        const mappedInvoices = invoicesData.map((invoice) => {
+          const items = invoiceItemsData.filter((item) => item.invoice_id === invoice.id);
+          const diamondIds = items.map((item) => item.diamond_id);
           return {
             id: invoice.id,
             invoiceNumber: invoice.invoice_number,
             issueDate: invoice.issue_date,
             dueDate: invoice.due_date,
             clientId: invoice.client_id,
-            diamonds: diamondIds, // Store the diamond IDs for this invoice
+            diamonds: diamondIds,
             totalAmount: invoice.total_amount,
             status: invoice.status as 'pending' | 'paid',
             paymentDate: invoice.payment_date || undefined,
+            paymentMethod: invoice.payment_method ?? undefined,
             notes: invoice.notes || undefined,
           };
         });
-        
+
         setInvoices(mappedInvoices);
       } else {
         setInvoices([]);
       }
-      
+
       setMarketRates(marketRatesData ? marketRatesData.map(mapSupabaseMarketRateToMarketRate) : []);
-      setCompanyDetails(companyData ? mapSupabaseCompanyDetailsToCompanyDetails(companyData) : null);
-      
-    } catch (error: any) {
+      setCompanyDetails(
+        mapSupabaseCompanyDetailsToCompanyDetails(companyData)
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error('Error loading data:', error);
-      toast.error(`Error loading data: ${error.message}`);
+      toast.error(`Error loading data: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -288,89 +250,38 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getCompleteInvoice = async (invoiceId: string): Promise<CompleteInvoice | null> => {
     try {
       console.log(`Getting complete invoice details for ID: ${invoiceId}`);
-      
-      // Find the invoice
-      const invoice = invoices.find(inv => inv.id === invoiceId);
+
+      const invoice = invoices.find((inv) => inv.id === invoiceId);
       if (!invoice) {
         console.error(`Invoice with ID ${invoiceId} not found in context`);
         return null;
       }
 
-      // Get client details
-      const client = clients.find(c => c.id === invoice.clientId);
+      const client = clients.find((c) => c.id === invoice.clientId);
       if (!client) {
         console.error(`Client with ID ${invoice.clientId} not found for invoice ${invoiceId}`);
         return null;
       }
 
-      // Get diamond details by directly checking the invoice_items table
-      // This is more reliable than using the diamonds array in the invoice object
-      const { data: invoiceItems, error: itemsError } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', invoiceId);
-      
-      if (itemsError) {
-        console.error('Error fetching invoice items:', itemsError);
-        throw itemsError;
-      }
-      
-      console.log(`Found ${invoiceItems?.length || 0} invoice items for invoice ${invoiceId}:`, invoiceItems);
-      
-      // Get all diamond IDs from invoice items
-      const diamondIds = invoiceItems?.map(item => item.diamond_id) || [];
-      
-      let diamondDetails = [];
-      
-      if (diamondIds.length > 0) {
-        // First try to get diamonds from context
-        const contextDiamonds = diamonds.filter(d => diamondIds.includes(d.id));
-        
-        if (contextDiamonds.length === diamondIds.length) {
-          // All diamonds found in context
-          diamondDetails = contextDiamonds;
-        } else {
-          // Some diamonds missing from context, fetch directly from database
-          console.log("Some diamonds not found in context, fetching from database...");
-          
-          const { data: dbDiamonds, error: diamondsError } = await supabase
-            .from('diamonds')
-            .select('*')
-            .in('id', diamondIds);
-            
-          if (diamondsError) {
-            console.error('Error fetching diamonds from database:', diamondsError);
-            throw diamondsError;
-          }
-          
-          // Map database diamonds to app format
-          diamondDetails = dbDiamonds?.map(d => ({
-            id: d.id,
-            entryDate: d.entry_date,
-            clientId: d.client_id,
-            kapanId: d.kapan_id,
-            numberOfDiamonds: d.number_of_diamonds,
-            weightInKarats: d.weight_in_karats,
-            marketRate: d.market_rate,
-            category: d.category,
-            rawDamageWeight: d.raw_damage_weight || undefined,
-            totalValue: d.total_value
-          })) || [];
-        }
-      }
-      
-      console.log(`Found ${diamondDetails.length} diamond details for invoice ${invoiceId}:`, diamondDetails);
+      const { diamonds: dbDiamondRows } = await apiJson<{ diamonds: SupabaseDiamond[] }>(
+        `/invoices/${invoiceId}/with-diamonds`
+      );
 
-      // Return complete invoice data with diamonds
+      const diamondDetails =
+        dbDiamondRows?.length > 0
+          ? dbDiamondRows.map(mapSupabaseDiamondToDiamond)
+          : [];
+
       return {
         ...invoice,
         client,
         diamondDetails,
         company: companyDetails as CompanyDetails,
       };
-    } catch (error: any) {
-      console.error(`Error fetching complete invoice: ${error.message}`, error);
-      toast.error(`Error fetching invoice details: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`Error fetching complete invoice: ${msg}`, error);
+      toast.error(`Error fetching invoice details: ${msg}`);
       return null;
     }
   };
@@ -378,51 +289,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to update company details
   const updateCompanyDetails = async (details: Partial<CompanyDetails>) => {
     try {
-      if (!companyDetails) {
-        // Create new company details if none exist
-        const { data, error } = await supabase
-          .from('company_details')
-          .insert({
+      if (!companyDetails || companyDetails.id === 'default') {
+        await apiJson('/company-details', {
+          method: 'POST',
+          body: JSON.stringify({
             company_name: details.companyName!,
             address: details.address!,
-            phone: details.phone || null,
-            email: details.email || null,
-            gst_number: details.gstNumber || null,
+            phone: details.phone ?? null,
+            email: details.email ?? null,
+            gst_number: details.gstNumber ?? null,
             bank_name: details.bankName!,
             account_number: details.accountNumber!,
-            account_holder_name: details.accountHolderName!, // Add new field
+            account_holder_name: details.accountHolderName!,
             ifsc_code: details.ifscCode!,
             branch: details.branch!,
-          })
-          .select()
-          .single();
-  
-        if (error) throw error;
+          }),
+        });
       } else {
-        // Update existing company details
-        const { error } = await supabase
-          .from('company_details')
-          .update({
+        await apiJson(`/company-details/${companyDetails.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
             company_name: details.companyName || companyDetails.companyName,
             address: details.address || companyDetails.address,
-            phone: details.phone || companyDetails.phone,
-            email: details.email || companyDetails.email,
-            gst_number: details.gstNumber || companyDetails.gstNumber,
+            phone: details.phone ?? companyDetails.phone ?? null,
+            email: details.email ?? companyDetails.email ?? null,
+            gst_number: details.gstNumber ?? companyDetails.gstNumber ?? null,
             bank_name: details.bankName || companyDetails.bankName,
             account_number: details.accountNumber || companyDetails.accountNumber,
-            account_holder_name: details.accountHolderName || companyDetails.accountHolderName, // Add new field
+            account_holder_name:
+              details.accountHolderName ?? companyDetails.accountHolderName,
             ifsc_code: details.ifscCode || companyDetails.ifscCode,
             branch: details.branch || companyDetails.branch,
-          })
-          .eq('id', companyDetails.id);
-  
-        if (error) throw error;
+          }),
+        });
       }
-  
+
       await fetchData();
       toast.success('Company details updated successfully');
-    } catch (error: any) {
-      toast.error(`Error updating company details: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error updating company details: ${msg}`);
       throw error;
     }
   };
@@ -430,17 +336,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Refetch data function exposed in the context
   const refetchData = fetchData;
 
-  // Initial data loading
+  // Load business data only when authenticated (JWT is sent by apiJson)
   useEffect(() => {
+    if (!user) {
+      setClients([]);
+      setDiamonds([]);
+      setInvoices([]);
+      setMarketRates([]);
+      setCompanyDetails(null);
+      setIsLoading(false);
+      return;
+    }
     fetchData();
-  }, [session]);
+  }, [user]);
 
   // Function to update a client
   const updateClient = async (updatedClient: Client) => {
     try {
-      const { error } = await supabase
-        .from('clients')
-        .update({
+      await apiJson(`/clients/${updatedClient.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
           name: updatedClient.name,
           contact_person: updatedClient.contactPerson,
           phone: updatedClient.phone,
@@ -450,15 +365,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           four_p_minus_rate: updatedClient.rates.fourPMinus,
           payment_terms: updatedClient.paymentTerms,
           notes: updatedClient.notes,
-        })
-        .eq('id', updatedClient.id);
+        }),
+      });
 
-      if (error) throw error;
-
-      await fetchData(); // Refetch all data
+      await fetchData();
       toast.success('Client updated successfully');
-    } catch (error: any) {
-      toast.error(`Error updating client: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error updating client: ${msg}`);
       console.error('Error updating client:', error);
     }
   };
@@ -466,17 +380,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to delete a client
   const deleteClient = async (id: string) => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      await fetchData(); // Refetch all data
+      await apiJson(`/clients/${id}`, { method: 'DELETE' });
+
+      await fetchData();
       toast.success('Client deleted successfully');
-    } catch (error: any) {
-      toast.error(`Error deleting client: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error deleting client: ${msg}`);
       console.error('Error deleting client:', error);
     }
   };
@@ -484,9 +394,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to add a client
   const addClient = async (clientData: Omit<Client, 'id'>) => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert({
+      await apiJson('/clients', {
+        method: 'POST',
+        body: JSON.stringify({
           name: clientData.name,
           contact_person: clientData.contactPerson,
           phone: clientData.phone,
@@ -496,15 +406,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           four_p_minus_rate: clientData.rates.fourPMinus,
           payment_terms: clientData.paymentTerms,
           notes: clientData.notes,
-        })
-        .select();
+        }),
+      });
 
-      if (error) throw error;
-
-      await fetchData(); // Refetch all data
+      await fetchData();
       toast.success('Client added successfully');
-    } catch (error: any) {
-      toast.error(`Error adding client: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error adding client: ${msg}`);
       throw error;
     }
   };
@@ -538,10 +447,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to update a diamond
   const updateDiamond = async (updatedDiamond: Diamond) => {
     try {
-      const { data, error } = await supabase
-        .from('diamonds')
-        .update({
-          id: updatedDiamond.id,
+      await apiJson(`/diamonds/${updatedDiamond.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
           entry_date: updatedDiamond.entryDate,
           client_id: updatedDiamond.clientId,
           kapan_id: updatedDiamond.kapanId,
@@ -549,17 +457,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           weight_in_karats: updatedDiamond.weightInKarats,
           market_rate: updatedDiamond.marketRate,
           category: updatedDiamond.category,
-          raw_damage_weight: updatedDiamond.rawDamageWeight || null,
+          raw_damage_weight: updatedDiamond.rawDamageWeight ?? null,
           total_value: updatedDiamond.totalValue,
-        } as Database['public']['Tables']['diamonds']['Update'])
-        .select();
-      
-      if (error) throw error;
-      
-      await fetchData(); // Refetch all data
+        } satisfies Database['public']['Tables']['diamonds']['Update']),
+      });
+
+      await fetchData();
       toast.success('Diamond updated successfully');
-    } catch (error: any) {
-      toast.error(`Error updating diamond: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error updating diamond: ${msg}`);
       console.error('Error updating diamond:', error);
     }
   };
@@ -567,17 +474,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to delete a diamond
   const deleteDiamond = async (id: string) => {
     try {
-      const { data, error } = await supabase
-        .from('diamonds')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      await fetchData(); // Refetch all data
+      await apiJson(`/diamonds/${id}`, { method: 'DELETE' });
+
+      await fetchData();
       toast.success('Diamond deleted successfully');
-    } catch (error: any) {
-      toast.error(`Error deleting diamond: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error deleting diamond: ${msg}`);
       console.error('Error deleting diamond:', error);
     }
   };
@@ -594,9 +497,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         diamondData.rawDamageWeight
       );
 
-      const { data, error } = await supabase
-        .from('diamonds')
-        .insert({
+      await apiJson('/diamonds', {
+        method: 'POST',
+        body: JSON.stringify({
           entry_date: diamondData.entryDate,
           client_id: diamondData.clientId,
           kapan_id: diamondData.kapanId,
@@ -604,17 +507,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           weight_in_karats: diamondData.weightInKarats,
           market_rate: diamondData.marketRate,
           category,
-          raw_damage_weight: diamondData.rawDamageWeight || null,
+          raw_damage_weight: diamondData.rawDamageWeight ?? null,
           total_value: totalValue,
-        } as Database['public']['Tables']['diamonds']['Insert'])
-        .select();
-      
-      if (error) throw error;
-      
-      await fetchData(); // Refetch all data
+        } satisfies Database['public']['Tables']['diamonds']['Insert']),
+      });
+
+      await fetchData();
       toast.success('Diamond entry added successfully');
-    } catch (error: any) {
-      toast.error(`Error adding diamond: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error adding diamond: ${msg}`);
       throw error;
     }
   };
@@ -622,21 +524,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to update market rate
   const updateMarketRate = async (rate: MarketRate) => {
     try {
-      const { data, error } = await supabase
-        .from('market_rates')
-        .insert({
+      await apiJson('/market-rates', {
+        method: 'POST',
+        body: JSON.stringify({
           date: rate.date,
           four_p_plus_rate: rate.fourPPlusRate,
           four_p_minus_rate: rate.fourPMinusRate,
-        } as Database['public']['Tables']['market_rates']['Insert'])
-        .select();
-      
-      if (error) throw error;
-      
-      await fetchData(); // Refetch all data
+        } satisfies Database['public']['Tables']['market_rates']['Insert']),
+      });
+
+      await fetchData();
       toast.success('Market rate updated successfully');
-    } catch (error: any) {
-      toast.error(`Error updating market rate: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error updating market rate: ${msg}`);
       console.error('Error updating market rate:', error);
     }
   };
@@ -649,20 +550,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to generate invoice number
   const generateInvoiceNumber = async () => {
     try {
-      const { count, error: countError } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true });
-
-      if (countError) throw countError;
+      const { count } = await apiJson<{ count: number }>('/invoices/count');
 
       const nextNumber = (count || 0) + 1;
       const today = new Date();
       const year = today.getFullYear();
       const month = String(today.getMonth() + 1).padStart(2, '0');
-      
+
       return `INV-${year}${month}-${String(nextNumber).padStart(4, '0')}`;
-    } catch (error: any) {
-      toast.error(`Error generating invoice number: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error generating invoice number: ${msg}`);
       throw error;
     }
   };
@@ -670,85 +568,57 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to add an invoice
   const addInvoice = async (invoiceData: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
     try {
-      // Log the diamonds for debugging
-      console.log("Creating invoice with diamonds:", invoiceData.diamonds);
-      
+      console.log('Creating invoice with diamonds:', invoiceData.diamonds);
+
       if (!invoiceData.diamonds || invoiceData.diamonds.length === 0) {
-        console.warn("No diamonds selected for this invoice!");
+        console.warn('No diamonds selected for this invoice!');
       }
-      
+
       const invoiceNumber = await generateInvoiceNumber();
-      
-      // First, create the invoice record
-      const { data, error } = await supabase
-        .from('invoices')
-        .insert({
+
+      const invoice_items: {
+        diamond_id: string;
+        quantity: number;
+        price: number;
+        description: string;
+      }[] = [];
+
+      for (const diamondId of invoiceData.diamonds || []) {
+        const diamond = diamonds.find((d) => d.id === diamondId);
+        if (!diamond) {
+          console.warn(`Diamond with ID ${diamondId} not found, skipping`);
+          continue;
+        }
+        invoice_items.push({
+          diamond_id: diamondId,
+          quantity: 1,
+          price: diamond.totalValue,
+          description: `${diamond.kapanId || 'N/A'} - ${diamond.numberOfDiamonds} pieces, ${diamond.weightInKarats} karats`,
+        });
+      }
+
+      await apiJson('/invoices', {
+        method: 'POST',
+        body: JSON.stringify({
           invoice_number: invoiceNumber,
           issue_date: invoiceData.issueDate,
           due_date: invoiceData.dueDate,
           client_id: invoiceData.clientId,
           total_amount: invoiceData.totalAmount,
           status: invoiceData.status,
-          payment_date: invoiceData.paymentDate || null,
-          notes: invoiceData.notes || null,
-        })
-        .select();
-      
-      if (error) {
-        console.error("Error creating invoice:", error);
-        throw error;
-      }
-      
-      // If invoice was created successfully and we have diamond IDs
-      if (data && data[0] && invoiceData.diamonds && invoiceData.diamonds.length > 0) {
-        const invoiceId = data[0].id;
-        console.log(`Invoice created with ID: ${invoiceId}, creating items for diamonds:`, invoiceData.diamonds);
-        
-        // Now create invoice_items entries for each diamond
-        const invoiceItems = [];
-        
-        for (const diamondId of invoiceData.diamonds) {
-          const diamond = diamonds.find(d => d.id === diamondId);
-          if (!diamond) {
-            console.warn(`Diamond with ID ${diamondId} not found, skipping`);
-            continue;
-          }
-          
-          // Create an invoice item for this diamond
-          invoiceItems.push({
-            invoice_id: invoiceId,
-            diamond_id: diamondId,
-            quantity: 1, // Default quantity
-            price: diamond.totalValue,
-            description: `${diamond.kapanId || 'N/A'} - ${diamond.numberOfDiamonds} pieces, ${diamond.weightInKarats} karats`
-          });
-        }
-        
-        // Insert all invoice items if we have any
-        if (invoiceItems.length > 0) {
-          console.log("Creating invoice items:", invoiceItems);
-          
-          const { data: itemsData, error: itemsError } = await supabase
-            .from('invoice_items')
-            .insert(invoiceItems)
-            .select();
-          
-          if (itemsError) {
-            console.error("Error creating invoice items:", itemsError);
-            // Don't throw the error - we still created the invoice
-            toast.warning("Invoice created but there was an error linking some diamonds");
-          } else {
-            console.log(`Successfully created ${itemsData?.length} invoice items:`, itemsData);
-          }
-        }
-      }
-      
-      // Refresh data to update state
+          payment_date: invoiceData.paymentDate ?? null,
+          payment_method: invoiceData.paymentMethod ?? null,
+          notes: invoiceData.notes ?? null,
+          invoice_items,
+        }),
+      });
+
       await fetchData();
       toast.success('Invoice created successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('Error creating invoice:', error);
-      toast.error(`Error creating invoice: ${error.message}`);
+      toast.error(`Error creating invoice: ${msg}`);
       throw error;
     }
   };
@@ -756,89 +626,54 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Function to update an invoice
   const updateInvoice = async (updatedInvoice: Invoice) => {
     try {
-      console.log("Updating invoice with diamonds:", updatedInvoice.diamonds);
-      
-      // First, update the invoice record
-      const { error } = await supabase
-        .from('invoices')
-        .update({
-          issue_date: updatedInvoice.issueDate,
-          due_date: updatedInvoice.dueDate,
-          client_id: updatedInvoice.clientId,
-          total_amount: updatedInvoice.totalAmount,
-          status: updatedInvoice.status,
-          payment_date: updatedInvoice.paymentDate || null,
-          notes: updatedInvoice.notes || null,
-        })
-        .eq('id', updatedInvoice.id);
-      
-      if (error) {
-        console.error("Error updating invoice:", error);
-        throw error;
-      }
-      
-      // Delete existing invoice items - we'll recreate them
-      console.log(`Deleting existing invoice items for invoice ${updatedInvoice.id}`);
-      const { error: deleteError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', updatedInvoice.id);
-      
-      if (deleteError) {
-        console.error('Error deleting existing invoice items:', deleteError);
-        throw deleteError;
-      }
-      
-      // Create new invoice_items entries for each diamond
+      console.log('Updating invoice with diamonds:', updatedInvoice.diamonds);
+
+      const invoice_items: {
+        diamond_id: string;
+        quantity: number;
+        price: number;
+        description: string;
+      }[] = [];
+
       if (updatedInvoice.diamonds && updatedInvoice.diamonds.length > 0) {
-        console.log(`Creating new invoice items for diamonds:`, updatedInvoice.diamonds);
-        
-        const invoiceItems = [];
-        
         for (const diamondId of updatedInvoice.diamonds) {
-          const diamond = diamonds.find(d => d.id === diamondId);
+          const diamond = diamonds.find((d) => d.id === diamondId);
           if (!diamond) {
             console.warn(`Diamond with ID ${diamondId} not found, skipping`);
             continue;
           }
-          
-          // Create an invoice item for this diamond
-          invoiceItems.push({
-            invoice_id: updatedInvoice.id,
+          invoice_items.push({
             diamond_id: diamondId,
-            quantity: 1, // Default quantity
+            quantity: 1,
             price: diamond.totalValue,
-            description: `${diamond.kapanId || 'N/A'} - ${diamond.numberOfDiamonds} pieces, ${diamond.weightInKarats} karats`
+            description: `${diamond.kapanId || 'N/A'} - ${diamond.numberOfDiamonds} pieces, ${diamond.weightInKarats} karats`,
           });
         }
-        
-        // Insert all invoice items if we have any
-        if (invoiceItems.length > 0) {
-          console.log("Creating new invoice items:", invoiceItems);
-          
-          const { data: itemsData, error: itemsError } = await supabase
-            .from('invoice_items')
-            .insert(invoiceItems)
-            .select();
-          
-          if (itemsError) {
-            console.error("Error creating invoice items during update:", itemsError);
-            // Don't throw the error - we still updated the invoice
-            toast.warning("Invoice updated but there was an error linking some diamonds");
-          } else {
-            console.log(`Successfully created ${itemsData?.length} invoice items:`, itemsData);
-          }
-        }
-      } else {
-        console.warn("No diamonds selected for this invoice update!");
       }
-      
-      // Refresh data to update state
+
+      await apiJson(`/invoices/${updatedInvoice.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          invoice: {
+            issue_date: updatedInvoice.issueDate,
+            due_date: updatedInvoice.dueDate,
+            client_id: updatedInvoice.clientId,
+            total_amount: updatedInvoice.totalAmount,
+            status: updatedInvoice.status,
+            payment_date: updatedInvoice.paymentDate ?? null,
+            payment_method: updatedInvoice.paymentMethod ?? null,
+            notes: updatedInvoice.notes ?? null,
+          },
+          invoice_items,
+        }),
+      });
+
       await fetchData();
       toast.success('Invoice updated successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('Error updating invoice:', error);
-      toast.error(`Error updating invoice: ${error.message}`);
+      toast.error(`Error updating invoice: ${msg}`);
       throw error;
     }
   };
@@ -847,58 +682,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Updated deleteInvoice function with better error handling and logging
   const deleteInvoice = async (id: string) => {
     try {
-      console.log(`Starting deletion process for invoice ID: ${id}`);
-      
-      // First, check if invoice items exist
-      const { data: existingItems, error: checkError } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', id);
-      
-      if (checkError) {
-        console.error("Error checking invoice items:", checkError);
-        throw checkError;
-      }
-      
-      console.log(`Found ${existingItems?.length || 0} invoice items to delete`);
-      
-      // Delete invoice items with explicit error logging
-      const { data: deletedItems, error: itemsError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', id)
-        .select();
-      
-      if (itemsError) {
-        console.error("Error deleting invoice items:", itemsError);
-        throw itemsError;
-      }
-      
-      console.log(`Successfully deleted ${deletedItems?.length || 0} invoice items`);
-      
-      // Now delete the invoice with explicit error logging
-      const { data: deletedInvoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', id)
-        .select();
-      
-      if (invoiceError) {
-        console.error("Error deleting invoice:", invoiceError);
-        throw invoiceError;
-      }
-      
-      if (!deletedInvoice || deletedInvoice.length === 0) {
-        console.warn(`No invoice with ID ${id} was found to delete`);
-      } else {
-        console.log(`Successfully deleted invoice with ID: ${id}`);
-      }
-      
+      await apiJson(`/invoices/${id}`, { method: 'DELETE' });
+
       await fetchData();
       toast.success('Invoice deleted successfully');
-    } catch (error: any) {
-      console.error("Full invoice deletion error:", error);
-      toast.error(`Error deleting invoice: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Full invoice deletion error:', error);
+      toast.error(`Error deleting invoice: ${msg}`);
       throw error;
     }
   };
